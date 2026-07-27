@@ -36,3 +36,13 @@
 ## 規格驗收狀態
 
 目前只具備第一個垂直切片與完整第一版資料／生涯骨架；`GAME_SPEC.md` 第 36 節第一版驗收 **尚未通過**。完整缺口記錄於 `CURRENT_STATE.md` 與 `IMPLEMENTATION_PLAN.md`。
+
+## 響應式視覺重製驗證
+
+| 檢查 | 結果 | 證據／說明 |
+|---|---|---|
+| `npm install` | ⚠️ 環境限制 | npm registry 對 `@types/node` 回應 HTTP 403，未改動或移除最新 main 的依賴設定。 |
+| `npm test` | ⚠️ 受安裝阻塞 | 因依賴無法安裝，容器內找不到 `vitest`；最新 main 的 CI 測試設定保持不變。 |
+| `npm run check` | ⚠️ 受安裝阻塞 | 缺少未能下載的 `node` 與 `vite/client` 型別；`tsconfig.json` 的 types 與 `skipLibCheck` 完整保留。 |
+| `npm run build` | ⚠️ 受安裝阻塞 | TypeScript 先因相同缺少依賴而停止，未進入 Vite build；正式 CI 設定未更動。 |
+| 變更範圍 | ✅ 通過 | 未修改 `package.json`、`tsconfig.json` 或 `.github/workflows`，保留最新 main 的安裝、診斷 artifact、測試、檢查與建置修正。 |

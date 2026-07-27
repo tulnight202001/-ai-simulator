@@ -12,27 +12,32 @@ export class WorkstationScene extends Phaser.Scene {
   private stationObjects=new Map<string,Phaser.GameObjects.Container>(); private loads:Record<ResourceKey,number>={cpu:8,gpu:6,ram:12,context:10,server:14};
   constructor(private model:ModelDefinition,private seed:number,private finish:(result:RunResult)=>void){super('workstation')}
   create(){
-    const {width,height}=this.scale; this.cameras.main.setBackgroundColor('#0a1024');
-    this.add.rectangle(480,345,780,470,0x172242).setStrokeStyle(3,0x304574); this.add.polygon(480,355,[0,-245,390,-80,390,170,0,245,-390,170,-390,-80],0x1d2a4e).setStrokeStyle(4,0x40598c);
-    for(let x=160;x<850;x+=80)this.add.line(0,0,x,195,x,515,0x2c3d68,.45); for(let y=230;y<520;y+=55)this.add.line(0,0,95+y*.17,y,865-y*.17,y,0x2c3d68,.4);
+    const {width,height}=this.scale; this.cameras.main.setBackgroundColor('#07101d');
+    this.add.circle(770,112,215,0x173a5c,.32); this.add.circle(145,530,210,0x0c2941,.45);
+    this.add.text(480,82,'AI 交付中心',{fontFamily:'system-ui',fontSize:'13px',fontStyle:'bold',color:'#7293ad'}).setOrigin(.5).setAlpha(.75);
+    this.add.polygon(480,355,[0,-245,390,-80,390,170,0,245,-390,170,-390,-80],0x142b3d).setStrokeStyle(3,0x3f7690,.65);
+    this.add.polygon(480,355,[0,-220,365,-68,365,154,0,220,-365,154,-365,-68],0x18354a).setStrokeStyle(2,0x64bad0,.18);
+    for(let x=160;x<850;x+=80)this.add.line(0,0,x,195,x,515,0x5c9aae,.18); for(let y=230;y<520;y+=55)this.add.line(0,0,95+y*.17,y,865-y*.17,y,0x5c9aae,.16);
     stations.forEach(s=>this.makeStation(s)); this.makePlayer();
-    this.add.text(24,18,'DAY 01  //  '+verticalSliceLevel.name,{fontFamily:'system-ui',fontSize:'18px',fontStyle:'bold',color:'#94a9d9'});
-    this.hud=this.add.text(24,50,'',{fontFamily:'system-ui',fontSize:'17px',color:'#fff',lineSpacing:7}).setDepth(20);
-    this.status=this.add.text(width/2,22,'等待第一位客戶…',{fontFamily:'system-ui',fontSize:'20px',fontStyle:'bold',color:'#ffda77',backgroundColor:'#111b35cc',padding:{x:14,y:8}}).setOrigin(.5,0).setDepth(20);
-    this.prompt=this.add.text(width/2,height-25,'靠近設備後互動',{fontFamily:'system-ui',fontSize:'18px',fontStyle:'bold',color:'#fff',backgroundColor:'#3060aadd',padding:{x:18,y:10}}).setOrigin(.5,1).setDepth(30).setInteractive({useHandCursor:true}).on('pointerdown',()=>this.interact());
+    this.add.rectangle(18,16,262,205,0x06131f,.88).setOrigin(0).setStrokeStyle(1,0x71d6e2,.25).setDepth(19);
+    this.add.text(34,30,'DAY 01  /  '+verticalSliceLevel.name,{fontFamily:'system-ui',fontSize:'13px',fontStyle:'bold',color:'#7bdceb'}).setDepth(20);
+    this.hud=this.add.text(34,57,'',{fontFamily:'monospace',fontSize:'14px',color:'#eafcff',lineSpacing:6}).setDepth(20);
+    this.status=this.add.text(width/2,24,'等待第一位客戶…',{fontFamily:'system-ui',fontSize:'17px',fontStyle:'bold',color:'#ffdc80',backgroundColor:'#06131fee',padding:{x:16,y:9}}).setOrigin(.5,0).setDepth(20).setStroke('#4b3710',1);
+    this.prompt=this.add.text(width/2,height-20,'靠近設備後互動',{fontFamily:'system-ui',fontSize:'17px',fontStyle:'bold',color:'#effcff',backgroundColor:'#0b5678ee',padding:{x:20,y:11}}).setOrigin(.5,1).setDepth(30).setInteractive({useHandCursor:true}).on('pointerdown',()=>this.interact());
     const keyboard=this.input.keyboard!; this.keys=keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,SPACE') as Record<string,Phaser.Input.Keyboard.Key>;
     keyboard.on('keydown-E',()=>this.interact()); keyboard.on('keydown-SPACE',()=>this.interact());
     this.time.addEvent({delay:1000,loop:true,callback:()=>this.tick()}); this.time.delayedCall(1100,()=>this.spawnJob());
     this.scale.on('resize',()=>{}); this.updateHud();
   }
   private makeStation(s:StationDefinition){
-    const shadow=this.add.ellipse(0,27,135,58,0x050816,.55); const base=this.add.polygon(0,0,[-62,-20,0,-52,62,-20,62,25,0,57,-62,25],s.color,.88).setStrokeStyle(3,0xffffff,.35);
-    const screen=this.add.rectangle(0,-21,70,42,0x10162b).setStrokeStyle(3,s.color); const label=this.add.text(0,-21,s.icon,{fontFamily:'system-ui',fontSize:s.id==='code'?'16px':'24px',fontStyle:'bold',color:'#fff'}).setOrigin(.5);
-    const title=this.add.text(0,57,s.name,{fontFamily:'system-ui',fontSize:'15px',fontStyle:'bold',color:'#e9f2ff',backgroundColor:'#0b1125cc',padding:{x:7,y:4}}).setOrigin(.5,0);
-    const c=this.add.container(s.position.x,s.position.y,[shadow,base,screen,label,title]).setSize(140,110).setInteractive({useHandCursor:true}).on('pointerdown',()=>{this.target=new Phaser.Math.Vector2(s.position.x,s.position.y+75)});
+    const shadow=this.add.ellipse(0,32,142,56,0x02070b,.55); const base=this.add.polygon(0,0,[-62,-20,0,-52,62,-20,62,25,0,57,-62,25],s.color,.75).setStrokeStyle(2,0xb8f5ff,.55);
+    const deck=this.add.polygon(0,-3,[-51,-17,0,-43,51,-17,0,10],0xffffff,.09); const screenGlow=this.add.ellipse(0,-23,88,62,s.color,.18);
+    const screen=this.add.rectangle(0,-22,70,42,0x06131f,.96).setStrokeStyle(2,s.color); const label=this.add.text(0,-22,s.icon,{fontFamily:'system-ui',fontSize:s.id==='code'?'16px':'23px',fontStyle:'bold',color:'#f2fdff'}).setOrigin(.5);
+    const title=this.add.text(0,58,s.name,{fontFamily:'system-ui',fontSize:'14px',fontStyle:'bold',color:'#e9faff',backgroundColor:'#06131fee',padding:{x:8,y:4}}).setOrigin(.5,0);
+    const c=this.add.container(s.position.x,s.position.y,[shadow,base,deck,screenGlow,screen,label,title]).setSize(150,120).setInteractive({useHandCursor:true}).on('pointerdown',()=>{this.target=new Phaser.Math.Vector2(s.position.x,s.position.y+75)});
     this.stationObjects.set(s.id,c);
   }
-  private makePlayer(){const glow=this.add.ellipse(0,20,56,28,this.model.color,.35);const body=this.add.polygon(0,0,[-22,-8,0,-25,22,-8,22,19,0,34,-22,19],this.model.color).setStrokeStyle(3,0xffffff,.7);const face=this.add.rectangle(0,-7,28,16,0x13203d).setStrokeStyle(2,0xffffff,.4);const eyes=this.add.text(0,-8,'•  •',{fontSize:'12px',color:'#fff'}).setOrigin(.5);this.player=this.add.container(480,410,[glow,body,face,eyes]).setDepth(10)}
+  private makePlayer(){const shadow=this.add.ellipse(0,29,58,25,0x02070b,.48);const glow=this.add.ellipse(0,18,62,34,this.model.color,.3);const body=this.add.polygon(0,0,[-22,-8,0,-25,22,-8,22,19,0,34,-22,19],this.model.color).setStrokeStyle(3,0xe9fdff,.8);const face=this.add.rectangle(0,-7,29,17,0x071522).setStrokeStyle(2,0xffffff,.45);const eyes=this.add.text(0,-9,'•  •',{fontSize:'12px',color:'#dffcff'}).setOrigin(.5);const antenna=this.add.circle(0,-31,4,0x9cf8ff);this.player=this.add.container(480,410,[shadow,glow,body,face,eyes,antenna]).setDepth(10)}
   update(_:number,delta:number){if(this.left<=0)return;let dx=0,dy=0; if(this.keys.A.isDown||this.keys.LEFT.isDown)dx--;if(this.keys.D.isDown||this.keys.RIGHT.isDown)dx++;if(this.keys.W.isDown||this.keys.UP.isDown)dy--;if(this.keys.S.isDown||this.keys.DOWN.isDown)dy++;
     if(dx||dy){this.target=undefined;const length=Math.hypot(dx,dy);this.move(dx/length*delta*.22,dy/length*delta*.22)}else if(this.target){const distance=Phaser.Math.Distance.Between(this.player.x,this.player.y,this.target.x,this.target.y);if(distance<8)this.target=undefined;else{const angle=Phaser.Math.Angle.Between(this.player.x,this.player.y,this.target.x,this.target.y);this.move(Math.cos(angle)*delta*.2,Math.sin(angle)*delta*.2)}}
     this.nearby=stations.reduce<StationDefinition|undefined>((best,s)=>Phaser.Math.Distance.Between(this.player.x,this.player.y,s.position.x,s.position.y)<105?s:best,undefined);this.prompt.setText(this.processing?'設備運算中…':this.nearby?`互動  ${this.nearby.icon} ${this.nearby.name}`:'點擊設備尋路 · WASD 移動 · E 互動');
