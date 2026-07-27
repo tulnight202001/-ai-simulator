@@ -43,3 +43,7 @@
 
 - 在可連線 npm registry 的 CI 重跑 install、test、check、build，再以 Pages Preview 驗證 390 × 844、844 × 390 與桌機視窗。
 - 本次完成後停止增加功能；客戶決策、完整工作區與五紀元仍依既有第二階段清單後續實作。
+
+## 生涯 UI 後的直接續作指令（2026-07-27）
+
+> 保留目前響應式工作站與新增的匯入、刪檔、升級、Agent 指派 UI。下一步把 `v1Levels`、`v1Workstations`、`v1Recipes` 轉成 Phaser 可直接消費的執行期資料，先完成關卡選擇／解鎖及 11 種設備的模組化地圖，再接客戶決策、追加返工與 Agent 自動處理。不可用選單顯示資料取代即時玩法。於可下載 npm 依賴的 GitHub Actions 重跑 install、test、check、build，並補桌機與 iPhone 截圖及離線驗證。

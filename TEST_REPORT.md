@@ -46,3 +46,15 @@
 | `npm run check` | ⚠️ 受安裝阻塞 | 缺少未能下載的 `node` 與 `vite/client` 型別；`tsconfig.json` 的 types 與 `skipLibCheck` 完整保留。 |
 | `npm run build` | ⚠️ 受安裝阻塞 | TypeScript 先因相同缺少依賴而停止，未進入 Vite build；正式 CI 設定未更動。 |
 | 變更範圍 | ✅ 通過 | 未修改 `package.json`、`tsconfig.json` 或 `.github/workflows`，保留最新 main 的安裝、診斷 artifact、測試、檢查與建置修正。 |
+
+## 2026-07-27 生涯管理 UI 驗證
+
+| 檢查 | 結果 | 證據／說明 |
+|---|---|---|
+| `npm install` | ⚠️ 環境限制 | registry 對 `@types/node` 回應 HTTP 403。 |
+| `npm test` | ⚠️ 受安裝阻塞 | 容器無 `vitest` 可執行檔。 |
+| `npm run check` | ⚠️ 受安裝阻塞 | 缺少未能下載的 `node` 與 `vite/client` 型別。 |
+| `npm run build` | ⚠️ 受安裝阻塞 | TypeScript 因相同缺少依賴而停止。 |
+| `python3 -m py_compile scripts/build_human_docs.py scripts/create_release_zip.py` | ✅ 通過 | 文件與封裝腳本語法有效。 |
+| `git diff --check` | ✅ 通過 | 變更無空白錯誤。 |
+| 瀏覽器截圖 | ⚠️ 受安裝阻塞 | 無法啟動 Vite，故本回合沒有偽造 UI 截圖。 |

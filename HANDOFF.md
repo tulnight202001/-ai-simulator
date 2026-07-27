@@ -54,3 +54,9 @@
 - `src/game/WorkstationScene.ts`、`src/main.ts` 與 `src/style.css` 已完成既有垂直切片的響應式視覺重製，未更動資料、生涯、依賴、TypeScript 或 CI 設定。
 - 容器執行 `npm install` 時 npm registry 回應 HTTP 403，連帶使本機 test、check、build 缺少依賴；應由既有 GitHub Actions 在可下載依賴的環境重新確認。
 - 本次範圍到此停止，仍不得把垂直切片標示為完整第一版。
+
+## 本次交接：生涯管理 UI（2026-07-27）
+
+- `src/main.ts` 已接上 JSON 匯入預覽／確認、存檔刪除、資料驅動升級購買與 Agent 指派；全部操作都使用既有 IndexedDB 生涯存檔。
+- `src/style.css` 加入桌機／手機皆可使用的升級卡、刪檔列與 Agent 設定樣式。
+- 升級數值效果與 Agent 執行仍未注入 `WorkstationScene`。接手者應先建立 v1 catalog 到即時場景的轉接層，避免繼續擴充舊四設備型別。
