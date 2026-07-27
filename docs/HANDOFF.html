@@ -43,4 +43,10 @@
 <li>執行 <code>python3 scripts/build_human_docs.py</code>，確認 <code>/docs</code> 與 <code>/exports/google-drive</code> 和 Markdown 同步。</li>
 <li>正式階段推送後確認 <code>release-archive.yml</code> 成功產生 ZIP artifact；本機產生的 ZIP 已被忽略，不得加入 Git。</li>
 <li>GitHub Pages 只發布 <code>/docs</code>；Google Drive HTML 與 ZIP 由使用者或其他已授權工具手動上傳，不把 OAuth Token 放進 Repository。</li>
+</ul>
+<h2>本次交接：響應式視覺重製</h2>
+<ul>
+<li><code>src/game/WorkstationScene.ts</code>、<code>src/main.ts</code> 與 <code>src/style.css</code> 已完成既有垂直切片的響應式視覺重製，未更動資料、生涯、依賴、TypeScript 或 CI 設定。</li>
+<li>容器執行 <code>npm install</code> 時 npm registry 回應 HTTP 403，連帶使本機 test、check、build 缺少依賴；應由既有 GitHub Actions 在可下載依賴的環境重新確認。</li>
+<li>本次範圍到此停止，仍不得把垂直切片標示為完整第一版。</li>
 </ul><hr><p>此 HTML 由 <code>scripts/build_human_docs.py</code> 從 Repository Markdown 自動產生，請勿單獨修改。</p></main></body></html>

@@ -38,3 +38,8 @@
 ## 下一個 Codex 任務可直接接續的指令
 
 > 從目前分支繼續，不要重建專案。先推送並讀取 GitHub Actions 的 npm install、test、check、build 結果，修正至全綠；再把 `src/data/v1Catalog.ts` 的 47 關、11 工作區、客戶決策、追加返工、升級與 Agent 全部接入 Phaser 即時場景。完成後實際跑桌機、手機尺寸、IndexedDB、PWA 離線測試，更新七份 Markdown、`/docs`、Google Drive exports 與安全 ZIP。不可因資料表存在就宣稱完整第一版完成。
+
+## 視覺重製後的驗證邊界
+
+- 在可連線 npm registry 的 CI 重跑 install、test、check、build，再以 Pages Preview 驗證 390 × 844、844 × 390 與桌機視窗。
+- 本次完成後停止增加功能；客戶決策、完整工作區與五紀元仍依既有第二階段清單後續實作。
