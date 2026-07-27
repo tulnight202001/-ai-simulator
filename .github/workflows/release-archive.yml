@@ -1,0 +1,30 @@
+name: 產生正式階段 ZIP 備份
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - CHANGELOG.md
+      - CURRENT_STATE.md
+      - scripts/create_release_zip.py
+
+permissions:
+  contents: read
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 取得專案
+        uses: actions/checkout@v4
+      - name: 重新產生人類可閱讀文件
+        run: python3 scripts/build_human_docs.py
+      - name: 建立不含依賴與敏感資料的 ZIP
+        run: python3 scripts/create_release_zip.py
+      - name: 保存階段 ZIP 為 workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-simulator-v0.2.0-alpha-20260727
+          path: ai-simulator-v0.2.0-alpha-20260727.zip
+          if-no-files-found: error
+          retention-days: 90

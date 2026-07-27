@@ -1,0 +1,20 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PROJECT OVERVIEW｜AI Simulator</title><style>
+:root{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans TC',sans-serif;color:#17213c;background:#f3f6fb;line-height:1.7}*{box-sizing:border-box}body{margin:0}header{background:linear-gradient(135deg,#101b38,#245b88);color:white;padding:28px max(20px,calc((100% - 920px)/2))}header a{color:#bdefff}main{max-width:920px;margin:auto;background:white;padding:28px clamp(18px,5vw,54px);min-height:100vh}h1,h2,h3{line-height:1.25;color:#12234b}h1{font-size:clamp(2rem,7vw,3rem)}h2{margin-top:2em;border-bottom:2px solid #dce6f5;padding-bottom:.3em}a{color:#1769aa}code{background:#edf2f8;padding:.15em .35em;border-radius:5px;overflow-wrap:anywhere}pre{background:#10182d;color:#edf6ff;padding:16px;border-radius:12px;overflow:auto}pre code{background:none;padding:0}blockquote{border-left:4px solid #54b8d1;margin-left:0;padding-left:18px;color:#485673}table{border-collapse:collapse;width:100%;display:block;overflow:auto}th,td{border:1px solid #ccd7e7;padding:8px;text-align:left}.meta,.notice{border-radius:12px;padding:13px 16px}.meta{background:#eaf3ff}.notice{background:#fff3cf;border-left:5px solid #e4ae2d}nav{display:flex;gap:8px;flex-wrap:wrap}nav a{background:#ffffff18;border:1px solid #ffffff38;border-radius:999px;padding:5px 11px;text-decoration:none}@media(max-width:600px){header{padding:22px 18px}main{padding:22px 18px}}
+</style></head><body><header><b>關於我重生為 AI 模型的⋯</b><p>人類可閱讀專案文件</p><nav><span>此檔案可直接離線開啟</span></nav></header><main><div class="meta">版本 0.2.0-alpha｜更新 2026-07-27｜程式基準 Commit bb9d072<br>內容來源：<code>README.md</code></div><h1>AI Simulator / 關於我重生為 AI 模型的⋯</h1>
+<p>手機優先的即時 AI 工作站管理 PWA。目前只有第一個<strong>可玩垂直切片</strong>，並非 <code>GAME_SPEC.md</code> 所定義的完整第一版。</p>
+<h2>人類可閱讀文件</h2>
+<ul>
+<li>直接開啟 <a href="docs/index.html"><code>docs/index.html</code></a> 查看手機友善的版本、完成度、目前可測試內容、已知問題與下一步。</li>
+<li>GitHub Pages 可用 <code>.github/workflows/docs-pages.yml</code> 免費發布 <code>/docs</code>；管理者需先在 Repository 的 Pages 設定選擇 GitHub Actions。</li>
+<li><code>exports/google-drive</code> 內是可單獨開啟並手動上傳 Google Drive 的最新 HTML；Repository 不保存 OAuth Token。</li>
+<li>Markdown 是唯一內容來源。修改主要文件後執行 <code>python3 scripts/build_human_docs.py</code> 同步 HTML。</li>
+<li>正式階段完成後執行 <code>python3 scripts/create_release_zip.py</code> 產生不含依賴、快取或敏感資料的完整交接 ZIP。</li>
+</ul>
+<pre><code>
+npm install
+
+npm run dev
+
+</code></pre>
+<p>開啟顯示網址、選擇三個模型之一，到櫃台領取資料箱，依指示完成加工並送回櫃台。正式驗證使用 <code>npm test &amp;&amp; npm run build</code>，並以 HTTPS 提供 <code>dist/</code> 才能測試安裝與離線。</p>
+<p>完整約 47 關、養成、Agent、生涯總評與無限模式的五階段路線請見 <code>IMPLEMENTATION_PLAN.md</code>。</p><hr><p>此 HTML 由 <code>scripts/build_human_docs.py</code> 從 Repository Markdown 自動產生，請勿單獨修改。</p></main></body></html>

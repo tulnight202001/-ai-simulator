@@ -1,0 +1,46 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>下一階段工作｜AI Simulator</title><style>
+:root{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans TC',sans-serif;color:#17213c;background:#f3f6fb;line-height:1.7}*{box-sizing:border-box}body{margin:0}header{background:linear-gradient(135deg,#101b38,#245b88);color:white;padding:28px max(20px,calc((100% - 920px)/2))}header a{color:#bdefff}main{max-width:920px;margin:auto;background:white;padding:28px clamp(18px,5vw,54px);min-height:100vh}h1,h2,h3{line-height:1.25;color:#12234b}h1{font-size:clamp(2rem,7vw,3rem)}h2{margin-top:2em;border-bottom:2px solid #dce6f5;padding-bottom:.3em}a{color:#1769aa}code{background:#edf2f8;padding:.15em .35em;border-radius:5px;overflow-wrap:anywhere}pre{background:#10182d;color:#edf6ff;padding:16px;border-radius:12px;overflow:auto}pre code{background:none;padding:0}blockquote{border-left:4px solid #54b8d1;margin-left:0;padding-left:18px;color:#485673}table{border-collapse:collapse;width:100%;display:block;overflow:auto}th,td{border:1px solid #ccd7e7;padding:8px;text-align:left}.meta,.notice{border-radius:12px;padding:13px 16px}.meta{background:#eaf3ff}.notice{background:#fff3cf;border-left:5px solid #e4ae2d}nav{display:flex;gap:8px;flex-wrap:wrap}nav a{background:#ffffff18;border:1px solid #ffffff38;border-radius:999px;padding:5px 11px;text-decoration:none}@media(max-width:600px){header{padding:22px 18px}main{padding:22px 18px}}
+</style></head><body><header><b>關於我重生為 AI 模型的⋯</b><p>人類可閱讀專案文件</p><nav><a href="../docs/GAME_SPEC.html">完整遊戲規格</a><a href="../docs/IMPLEMENTATION_PLAN.html">完整實作計畫</a><a href="../docs/CURRENT_STATE.html">目前狀態</a><a href="../docs/TEST_REPORT.html">測試報告</a><a href="../docs/HANDOFF.html">接手說明</a><a href="../docs/CHANGELOG.html">重要變更紀錄</a><a href="../docs/NEXT_STEPS.html">下一階段工作</a></nav></header><main><div class="meta">版本 0.2.0-alpha｜更新 2026-07-27｜程式基準 Commit bb9d072<br>內容來源：<code>NEXT_STEPS.md</code></div><h1>下一階段實際工作</h1>
+<p><strong>文件版本：0.2.0-alpha｜更新日期：2026-07-27｜程式基準 Commit：bb9d072</strong></p>
+<blockquote>不再交付垂直切片供使用者測試。內部 Preview 僅供自動檢查；在 <code>GAME_SPEC.md</code> 完整第一版達標前，不要求使用者驗收半成品。</blockquote>
+<h2>當前第一優先：重製正式視覺基礎</h2>
+<ul>
+<li>重建全視口工作站與響應式鏡頭，消除空白、重疊與溢位。</li>
+<li>將 HUD、任務、狀態和互動控制移出主要走動區，分別設計桌面及 iPhone 排列。</li>
+<li>以一致的原創 SVG／Canvas 造型重畫角色、資料箱、櫃台及 11 種工作設備。</li>
+<li>建立桌面與常見 iPhone viewport 截圖／溢位檢查；結果只作內部開發證據。</li>
+<li>視覺基礎穩定後，把 47 關、客戶決策、追加返工、升級、Agent、總評及無限模式逐一接入，而不是再製作另一個展示切片。</li>
+</ul>
+<h2>第一優先：讓目前切片真正可驗證</h2>
+<h3>尚未完成</h3>
+<ul>
+<li>在能正常下載 npm 套件的環境執行安裝、單元測試、型別檢查與正式建置。</li>
+<li>修正建置或遊玩時發現的問題，再部署 HTTPS Preview。</li>
+<li>用桌機完整交付單步與雙步任務；確認 180 秒結算和本機存檔。</li>
+<li>用 iPhone 尺寸及真機檢查點擊尋路、互動按鈕、安全區、背景返回和效能。</li>
+<li>首次載入後斷網重啟，確認遊戲與存檔仍可開啟。</li>
+</ul>
+<h3>阻塞</h3>
+<ul>
+<li>目前環境存取 npm registry 時收到 HTTP 403，無法產生可公開測試的正式建置。</li>
+<li>尚未有 GitHub Pages 網址。管理者需在 GitHub Repository 的 <strong>Settings → Pages → Build and deployment → GitHub Actions</strong> 啟用。</li>
+<li>目前容器中的分支沒有 Git remote，無法由 Codex push 並觸發已建立的 CI；需在有 remote 的持續開發環境執行。</li>
+</ul>
+<h2>第二優先：核心系統第二階段</h2>
+<h3>尚未完成</h3>
+<ul>
+<li>加入接受、追問、提醒限制、替代方案與拒絕的接單選擇。</li>
+<li>加入不同性格客戶、追加要求、返工、抱怨與滿意度。</li>
+<li>加入搜尋、文件、音樂、錄音、攝影、剪輯及部署等完整工作區。</li>
+<li>建立版本化多存檔、模型／設備／硬體升級與備份預覽。</li>
+</ul>
+<h2>每個正式階段完成檢查表</h2>
+<ul>
+<li>更新七份人類可閱讀 Markdown 文件的版本、日期、狀態與程式基準 Commit。</li>
+<li>執行 <code>python3 scripts/build_human_docs.py</code>，同步 <code>/docs</code> 與 <code>/exports/google-drive</code>。</li>
+<li>本機可執行 <code>python3 scripts/create_release_zip.py</code> 檢查 ZIP；ZIP 已被忽略，不得 Commit。正式備份由 <code>release-archive.yml</code> 產生 workflow artifact。</li>
+<li>檢查 ZIP 不含 <code>node_modules</code>、快取、建置暫存、Secrets、Token 或憑證。</li>
+<li>Commit 並推送 GitHub；確認 Pages 與測試網址，將結果寫回 <code>CURRENT_STATE.md</code>。</li>
+</ul>
+<h2>下一個 Codex 任務可直接接續的指令</h2>
+<blockquote>從目前分支繼續，不要重建或退回舊視覺。先完成 <code>WorkstationScene</code> 的桌面／iPhone 響應式鏡頭、獨立 HUD、11 種設備與角色／資料箱正式 Canvas 美術，並以 GitHub Actions 真實依賴修正 install、test、check、build 至全綠。之後把 <code>src/data/v1Catalog.ts</code> 的 47 關、客戶決策、追加返工、升級、Agent、總評與無限模式全部接入 Phaser 即時場景。完整第一版門檻全數通過前，只稱內部 build，不要求使用者測試。每次接續都更新七份 Markdown、<code>/docs</code>、Google Drive exports 與 artifact ZIP 流程。</blockquote><hr><p>此 HTML 由 <code>scripts/build_human_docs.py</code> 從 Repository Markdown 自動產生，請勿單獨修改。</p></main></body></html>
