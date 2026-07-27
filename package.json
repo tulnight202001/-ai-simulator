@@ -1,0 +1,14 @@
+{
+  "name": "ai-simulator",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "test": "vitest run",
+    "check": "tsc -b --pretty false"
+  },
+  "dependencies": { "phaser": "^3.90.0" },
+  "devDependencies": { "typescript": "^5.8.3", "vite": "^6.3.5", "vitest": "^3.1.3" }
+}
