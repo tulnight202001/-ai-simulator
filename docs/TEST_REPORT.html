@@ -40,4 +40,14 @@
 <p>| <code>npm test</code> | ⚠️ 受安裝阻塞 | 因依賴無法安裝，容器內找不到 <code>vitest</code>；最新 main 的 CI 測試設定保持不變。 |</p>
 <p>| <code>npm run check</code> | ⚠️ 受安裝阻塞 | 缺少未能下載的 <code>node</code> 與 <code>vite/client</code> 型別；<code>tsconfig.json</code> 的 types 與 <code>skipLibCheck</code> 完整保留。 |</p>
 <p>| <code>npm run build</code> | ⚠️ 受安裝阻塞 | TypeScript 先因相同缺少依賴而停止，未進入 Vite build；正式 CI 設定未更動。 |</p>
-<p>| 變更範圍 | ✅ 通過 | 未修改 <code>package.json</code>、<code>tsconfig.json</code> 或 <code>.github/workflows</code>，保留最新 main 的安裝、診斷 artifact、測試、檢查與建置修正。 |</p><hr><p>此 HTML 由 <code>scripts/build_human_docs.py</code> 從 Repository Markdown 自動產生，請勿單獨修改。</p></main></body></html>
+<p>| 變更範圍 | ✅ 通過 | 未修改 <code>package.json</code>、<code>tsconfig.json</code> 或 <code>.github/workflows</code>，保留最新 main 的安裝、診斷 artifact、測試、檢查與建置修正。 |</p>
+<h2>2026-07-27 生涯管理 UI 驗證</h2>
+<p>| 檢查 | 結果 | 證據／說明 |</p>
+<p>|---|---|---|</p>
+<p>| <code>npm install</code> | ⚠️ 環境限制 | registry 對 <code>@types/node</code> 回應 HTTP 403。 |</p>
+<p>| <code>npm test</code> | ⚠️ 受安裝阻塞 | 容器無 <code>vitest</code> 可執行檔。 |</p>
+<p>| <code>npm run check</code> | ⚠️ 受安裝阻塞 | 缺少未能下載的 <code>node</code> 與 <code>vite/client</code> 型別。 |</p>
+<p>| <code>npm run build</code> | ⚠️ 受安裝阻塞 | TypeScript 因相同缺少依賴而停止。 |</p>
+<p>| <code>python3 -m py_compile scripts/build_human_docs.py scripts/create_release_zip.py</code> | ✅ 通過 | 文件與封裝腳本語法有效。 |</p>
+<p>| <code>git diff --check</code> | ✅ 通過 | 變更無空白錯誤。 |</p>
+<p>| 瀏覽器截圖 | ⚠️ 受安裝阻塞 | 無法啟動 Vite，故本回合沒有偽造 UI 截圖。 |</p><hr><p>此 HTML 由 <code>scripts/build_human_docs.py</code> 從 Repository Markdown 自動產生，請勿單獨修改。</p></main></body></html>

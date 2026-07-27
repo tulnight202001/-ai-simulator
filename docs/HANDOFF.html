@@ -49,4 +49,10 @@
 <li><code>src/game/WorkstationScene.ts</code>、<code>src/main.ts</code> 與 <code>src/style.css</code> 已完成既有垂直切片的響應式視覺重製，未更動資料、生涯、依賴、TypeScript 或 CI 設定。</li>
 <li>容器執行 <code>npm install</code> 時 npm registry 回應 HTTP 403，連帶使本機 test、check、build 缺少依賴；應由既有 GitHub Actions 在可下載依賴的環境重新確認。</li>
 <li>本次範圍到此停止，仍不得把垂直切片標示為完整第一版。</li>
+</ul>
+<h2>本次交接：生涯管理 UI（2026-07-27）</h2>
+<ul>
+<li><code>src/main.ts</code> 已接上 JSON 匯入預覽／確認、存檔刪除、資料驅動升級購買與 Agent 指派；全部操作都使用既有 IndexedDB 生涯存檔。</li>
+<li><code>src/style.css</code> 加入桌機／手機皆可使用的升級卡、刪檔列與 Agent 設定樣式。</li>
+<li>升級數值效果與 Agent 執行仍未注入 <code>WorkstationScene</code>。接手者應先建立 v1 catalog 到即時場景的轉接層，避免繼續擴充舊四設備型別。</li>
 </ul><hr><p>此 HTML 由 <code>scripts/build_human_docs.py</code> 從 Repository Markdown 自動產生，請勿單獨修改。</p></main></body></html>
