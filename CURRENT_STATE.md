@@ -16,7 +16,7 @@
 - 建立五紀元共 47 關的資料表、11 種正式工作區、12 種單步至完整歌曲與 MV 配方、6 種客戶及升級資料；尚未全部接入即時 Phaser 場景。
 - 建立多模型 IndexedDB 生涯 schema version 2、舊版 migration、星級最佳成績、有限重玩獎勵、長期數值、升級、Agent／無限／總評資料結構。
 - 主選單可讀取多個生涯，模型三選一包含約 10% 稀有模型機率，結算會寫入長期生涯；JSON 可下載，匯入預覽核心已有但 UI 尚未接上。
-- 新增 GitHub Actions CI 與整站 Pages build。Codex 容器仍被 npm proxy 403 阻擋，且目前分支沒有可推送 remote，因此 Actions 尚未實際執行。
+- GitHub PR #1 的「遊戲建置與測試」已實際執行：`npm install` 與 `npm test` 通過，原本在 `npm run check` 因 CSS side-effect import 缺少 Vite client 型別而停止。本次已恢復 `vite/client` 型別；等待同一 PR 的 Actions 重新執行確認 check 與 build。
 
 ## 已完成（第一個可見垂直切片）
 
@@ -32,7 +32,7 @@
 
 理想環境執行 `npm install && npm run dev`，瀏覽 Vite URL；選模型後到櫃台領箱，依 HUD 先後前往設備，最後回櫃台。可把時間暫改或完整等待 180 秒查看結算與 IndexedDB `ai-simulator`。
 
-目前 Codex 執行環境對 npm registry 與 jsDelivr 皆回應 HTTP 403，因此本回合無法下載 Phaser/Vite/Vitest，也無法在此環境產生 build、啟動瀏覽器或公開 Preview。程式與 lockfile 需在可存取 npm 的 CI／開發環境完成驗證。
+Codex 容器對 npm registry 仍回應 HTTP 403，因此無法在容器重跑真實套件；GitHub Actions 已證明安裝與測試可執行。本次只修正 CI TypeScript 型別設定，不新增或刪除遊戲功能。
 
 ### 測試網址與文件網址
 
