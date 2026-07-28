@@ -27,7 +27,7 @@
 
 ## 下一輪必要驗證
 
-1. 合併 PR #1 並啟用 GitHub Pages，取得 HTTPS 遊戲網址。
+1. GitHub Pages 已啟用；後續以既有 HTTPS 網址持續驗證手機與 PWA 行為。
 2. 桌機完成單步與雙步資料箱各一次、等待倒數結算，確認 IndexedDB。
 3. 以 iPhone 尺寸與真機驗證點擊尋路、互動熱區、安全區、無橫向溢位與背景返回。
 4. HTTPS 首次載入後切斷網路、完全關閉再開啟，驗證 app shell、讀檔、重玩與再次自動存檔。
@@ -58,3 +58,10 @@
 | `python3 -m py_compile scripts/build_human_docs.py scripts/create_release_zip.py` | ✅ 通過 | 文件與封裝腳本語法有效。 |
 | `git diff --check` | ✅ 通過 | 變更無空白錯誤。 |
 | 瀏覽器截圖 | ⚠️ 受安裝阻塞 | 無法啟動 Vite，故本回合沒有偽造 UI 截圖。 |
+
+## 2026-07-28 執行期資料整合
+
+- `npm test`：通過，3 個測試檔、17 個測試。新增關卡解鎖、配方階段、錯站阻擋、客戶決策、追加、升級效果、Agent 指派／限制覆蓋。
+- `npm run check`：通過，未略過專案原始碼檢查。
+- `npm run build`：通過；Vite 僅回報既有的單一 Phaser bundle 大於 500 kB 警告。
+- GitHub Actions：本地 commit 後建立 PR，遠端狀態待 workflow 回報。

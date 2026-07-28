@@ -25,7 +25,7 @@
 </ul>
 <h2>下一輪必要驗證</h2>
 <ul>
-<li>合併 PR #1 並啟用 GitHub Pages，取得 HTTPS 遊戲網址。</li>
+<li>GitHub Pages 已啟用；後續以既有 HTTPS 網址持續驗證手機與 PWA 行為。</li>
 <li>桌機完成單步與雙步資料箱各一次、等待倒數結算，確認 IndexedDB。</li>
 <li>以 iPhone 尺寸與真機驗證點擊尋路、互動熱區、安全區、無橫向溢位與背景返回。</li>
 <li>HTTPS 首次載入後切斷網路、完全關閉再開啟，驗證 app shell、讀檔、重玩與再次自動存檔。</li>
@@ -50,4 +50,11 @@
 <p>| <code>npm run build</code> | ⚠️ 受安裝阻塞 | TypeScript 因相同缺少依賴而停止。 |</p>
 <p>| <code>python3 -m py_compile scripts/build_human_docs.py scripts/create_release_zip.py</code> | ✅ 通過 | 文件與封裝腳本語法有效。 |</p>
 <p>| <code>git diff --check</code> | ✅ 通過 | 變更無空白錯誤。 |</p>
-<p>| 瀏覽器截圖 | ⚠️ 受安裝阻塞 | 無法啟動 Vite，故本回合沒有偽造 UI 截圖。 |</p><hr><p>此 HTML 由 <code>scripts/build_human_docs.py</code> 從 Repository Markdown 自動產生，請勿單獨修改。</p></main></body></html>
+<p>| 瀏覽器截圖 | ⚠️ 受安裝阻塞 | 無法啟動 Vite，故本回合沒有偽造 UI 截圖。 |</p>
+<h2>2026-07-28 執行期資料整合</h2>
+<ul>
+<li><code>npm test</code>：通過，3 個測試檔、17 個測試。新增關卡解鎖、配方階段、錯站阻擋、客戶決策、追加、升級效果、Agent 指派／限制覆蓋。</li>
+<li><code>npm run check</code>：通過，未略過專案原始碼檢查。</li>
+<li><code>npm run build</code>：通過；Vite 僅回報既有的單一 Phaser bundle 大於 500 kB 警告。</li>
+<li>GitHub Actions：本地 commit 後建立 PR，遠端狀態待 workflow 回報。</li>
+</ul><hr><p>此 HTML 由 <code>scripts/build_human_docs.py</code> 從 Repository Markdown 自動產生，請勿單獨修改。</p></main></body></html>

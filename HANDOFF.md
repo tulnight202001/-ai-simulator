@@ -23,7 +23,7 @@
 - 正式開發必須以 `GAME_SPEC.md` 為準。
 - 中文正式名稱末尾的 `⋯` 是 U+22EF，不能替換。
 - 現有切片包含主選單、模型三選一、180 秒 2.5D 工作站、四設備、資料箱、單／雙步任務、五項負載、星級、IndexedDB 與 service worker。
-- 此環境的 npm registry／jsDelivr 回應 HTTP 403，依賴未能安裝，故尚無 build、瀏覽器或公開 Preview 證據；詳細命令見 `TEST_REPORT.md`。
+- 這是早期環境紀錄；目前依賴已存在且本地 test、check、build 可通過，GitHub Pages 與 Actions 也已存在。詳細命令見 `TEST_REPORT.md`。
 
 ## 接手後第一步
 
@@ -52,7 +52,7 @@
 ## 本次交接：響應式視覺重製
 
 - `src/game/WorkstationScene.ts`、`src/main.ts` 與 `src/style.css` 已完成既有垂直切片的響應式視覺重製，未更動資料、生涯、依賴、TypeScript 或 CI 設定。
-- 容器執行 `npm install` 時 npm registry 回應 HTTP 403，連帶使本機 test、check、build 缺少依賴；應由既有 GitHub Actions 在可下載依賴的環境重新確認。
+- 這是 2026-07-27 的歷史限制；目前本機 test、check、build 已通過，GitHub Actions 仍應驗證最新 commit。
 - 本次範圍到此停止，仍不得把垂直切片標示為完整第一版。
 
 ## 本次交接：生涯管理 UI（2026-07-27）
@@ -60,3 +60,9 @@
 - `src/main.ts` 已接上 JSON 匯入預覽／確認、存檔刪除、資料驅動升級購買與 Agent 指派；全部操作都使用既有 IndexedDB 生涯存檔。
 - `src/style.css` 加入桌機／手機皆可使用的升級卡、刪檔列與 Agent 設定樣式。
 - 升級數值效果與 Agent 執行仍未注入 `WorkstationScene`。接手者應先建立 v1 catalog 到即時場景的轉接層，避免繼續擴充舊四設備型別。
+
+## 2026-07-28 交接增量
+
+正式資料的第一個完整可玩區段已接入：五紀元／47 關選擇和逐關解鎖、11 工作區模組化即時地圖、資料驅動多階段資料箱、櫃台客戶決策與追加、執行期升級與受限 Agent。請保留 `src/core/v1Runtime.ts` 作為規則核心，不要把流程搬回 Phaser 畫面硬編碼。
+
+尚未達完整 v1：實際第二資料箱的切換／暫存互動、更多客戶抱怨與返工分支、Agent 錯誤率／品質的完整數值平衡、完整聲音／教學／暫停／總評／無限模式仍需後續完成。GitHub Pages 與 Actions 已存在且 CI 能正常安裝、測試、型別檢查及建置；多存檔、JSON 匯入、升級和 Agent UI 已完成。
