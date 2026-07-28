@@ -69,3 +69,9 @@
 ### 尚未完成
 
 - 升級效果與 Agent 自動處理尚未接入即時場景；47 關、完整工作區、客戶流程與正式驗收仍未完成。
+
+## 0.4.0-dev - 2026-07-28
+- Added five-era, 47-level selection with progression locks and best stars.
+- Connected all 11 workstations and the v1 recipe catalog to data-driven Phaser runtime maps.
+- Added staged project boxes, wrong-station blocking, customer decisions, post-delivery add-ons, runtime upgrade effects, and limited automatic Agents.
+- Added focused unit coverage for all new gameplay rule families.

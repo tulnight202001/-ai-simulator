@@ -1,49 +1,13 @@
-# 下一階段實際工作
+# NEXT STEPS
 
-**文件版本：0.2.0-alpha｜更新日期：2026-07-27｜程式基準 Commit：bb9d072**
+更新：2026-07-28。完整第一版尚未達 `GAME_SPEC.md` 驗收標準。
 
-## 第一優先：讓目前切片真正可驗證
+## 下一個任務可直接續作
 
-### 尚未完成
+1. 在 `src/core/v1Runtime.ts` 與 `WorkstationScene` 完成**真正可切換的多資料箱攜帶／暫存架**：依 `caseSlots` 顯示槽位、允許選箱、每箱各自保存階段與客戶綁定，加入測試。
+2. 將客戶流程深化為資料驅動狀態機：矛盾需求、逾時抱怨、品質不足返工、追加後再次交付；把投訴原因與滿意度明細寫入 `Career`，不可只顯示訊息。
+3. 為 Agent 加入 catalog 數值（速度、品質、錯誤率、RAM/server 負載），限定單步簡單任務並讓錯誤產生可返工成果；完成指定工作區、冷卻、休息與負載 UI。
+4. 以平衡模擬驗證 47 關星級門檻、獎勵與每紀元解鎖，確保三分鐘內各種配方實際可完成，禁止以延長等待替代複雜度。
+5. 完成教學、暫停、設定／聲音、能力詳情、生涯總評與無限模式；所有工作完成後再依 `GAME_SPEC.md` 做第一版驗收，未達標不得宣稱完成。
 
-1. 在能正常下載 npm 套件的環境執行安裝、單元測試、型別檢查與正式建置。
-2. 修正建置或遊玩時發現的問題，再部署 HTTPS Preview。
-3. 用桌機完整交付單步與雙步任務；確認 180 秒結算和本機存檔。
-4. 用 iPhone 尺寸及真機檢查點擊尋路、互動按鈕、安全區、背景返回和效能。
-5. 首次載入後斷網重啟，確認遊戲與存檔仍可開啟。
-
-### 阻塞
-
-- 目前環境存取 npm registry 時收到 HTTP 403，無法產生可公開測試的正式建置。
-- 尚未有 GitHub Pages 網址。管理者需在 GitHub Repository 的 **Settings → Pages → Build and deployment → GitHub Actions** 啟用。
-- 目前容器中的分支沒有 Git remote，無法由 Codex push 並觸發已建立的 CI；需在有 remote 的持續開發環境執行。
-
-## 第二優先：核心系統第二階段
-
-### 尚未完成
-
-- 加入接受、追問、提醒限制、替代方案與拒絕的接單選擇。
-- 加入不同性格客戶、追加要求、返工、抱怨與滿意度。
-- 加入搜尋、文件、音樂、錄音、攝影、剪輯及部署等完整工作區。
-- 建立版本化多存檔、模型／設備／硬體升級與備份預覽。
-
-## 每個正式階段完成檢查表
-
-- 更新七份人類可閱讀 Markdown 文件的版本、日期、狀態與程式基準 Commit。
-- 執行 `python3 scripts/build_human_docs.py`，同步 `/docs` 與 `/exports/google-drive`。
-- 本機可執行 `python3 scripts/create_release_zip.py` 檢查 ZIP；ZIP 已被忽略，不得 Commit。正式備份由 `release-archive.yml` 產生 workflow artifact。
-- 檢查 ZIP 不含 `node_modules`、快取、建置暫存、Secrets、Token 或憑證。
-- Commit 並推送 GitHub；確認 Pages 與測試網址，將結果寫回 `CURRENT_STATE.md`。
-
-## 下一個 Codex 任務可直接接續的指令
-
-> 從目前分支繼續，不要重建專案。先推送並讀取 GitHub Actions 的 npm install、test、check、build 結果，修正至全綠；再把 `src/data/v1Catalog.ts` 的 47 關、11 工作區、客戶決策、追加返工、升級與 Agent 全部接入 Phaser 即時場景。完成後實際跑桌機、手機尺寸、IndexedDB、PWA 離線測試，更新七份 Markdown、`/docs`、Google Drive exports 與安全 ZIP。不可因資料表存在就宣稱完整第一版完成。
-
-## 視覺重製後的驗證邊界
-
-- 在可連線 npm registry 的 CI 重跑 install、test、check、build，再以 Pages Preview 驗證 390 × 844、844 × 390 與桌機視窗。
-- 本次完成後停止增加功能；客戶決策、完整工作區與五紀元仍依既有第二階段清單後續實作。
-
-## 生涯 UI 後的直接續作指令（2026-07-27）
-
-> 保留目前響應式工作站與新增的匯入、刪檔、升級、Agent 指派 UI。下一步把 `v1Levels`、`v1Workstations`、`v1Recipes` 轉成 Phaser 可直接消費的執行期資料，先完成關卡選擇／解鎖及 11 種設備的模組化地圖，再接客戶決策、追加返工與 Agent 自動處理。不可用選單顯示資料取代即時玩法。於可下載 npm 依賴的 GitHub Actions 重跑 install、test、check、build，並補桌機與 iPhone 截圖及離線驗證。
+每次工作必須執行 `npm test`、`npm run check`、`npm run build`、`python3 scripts/build_human_docs.py`，同步 `/docs` 與 `/exports/google-drive`，並更新交接文件。
