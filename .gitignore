@@ -7,6 +7,10 @@ __pycache__/
 *.tsbuildinfo
 *.zip
 *.png
+!public/art/generated/*.png
+!public/art/generated/v2/
+!public/art/generated/v2/*.png
+.dev-server.*.log
 *.ico
 *.mp3
 *.wav

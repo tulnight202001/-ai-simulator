@@ -1,8 +1,8 @@
-name: 發布人類可閱讀文件
+name: 發布公開遊戲測試版
 on:
   push:
-    branches: [main, work]
-    paths: ['docs/**', 'src/**', 'public/**', 'package.json', 'index.html', '.github/workflows/docs-pages.yml']
+    branches: [full-v1-development]
+    paths: ['src/**', 'public/**', 'package.json', 'package-lock.json', 'index.html', 'vite.config.ts', '.github/workflows/docs-pages.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -12,7 +12,7 @@ concurrency:
   group: pages
   cancel-in-progress: true
 jobs:
-  deploy:
+  verify-and-deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -22,11 +22,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
+      - run: npm ci
+      - run: npm test
+      - run: npm run check
       - run: npm run build
-      - run: cp -R docs dist/docs
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: dist
       - name: Deploy
