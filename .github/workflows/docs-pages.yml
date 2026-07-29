@@ -14,7 +14,7 @@ concurrency:
 jobs:
   verify-and-deploy:
     environment:
-      name: github-pages
+      name: public-test
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
