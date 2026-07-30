@@ -2,6 +2,7 @@ import type { ResourceKey } from './content';
 
 export type WorkstationId = 'counter' | 'text' | 'search' | 'document' | 'art' | 'music' | 'recording' | 'studio' | 'video' | 'code' | 'deploy';
 export type EraId = 1 | 2 | 3 | 4 | 5;
+export type SequenceMode = 'ordered' | 'flexible';
 
 export interface WorkstationData {
   id: WorkstationId;
@@ -35,6 +36,7 @@ export interface RecipeData {
   action: string;
   result: string;
   icon: string;
+  sequenceMode: SequenceMode;
   steps: WorkstationId[];
   qualityTarget: number;
   reward: number;
@@ -106,7 +108,7 @@ export const v1Recipes: RecipeData[] = [
     purpose: '用最短篇幅讓讀者理解產品賣點',
     action: '整理重點並撰寫可直接發布的短文',
     result: '一則產品介紹短文',
-    icon: 'text', steps: ['text'], qualityTarget: 58, reward: 90,
+    icon: 'text', sequenceMode: 'ordered', steps: ['text'], qualityTarget: 58, reward: 90,
     addOns: ['再短一點', '再有感覺一點'],
   },
   {
@@ -114,7 +116,7 @@ export const v1Recipes: RecipeData[] = [
     purpose: '在社群動態中快速吸引目光',
     action: '製作符合貼文尺寸的主視覺',
     result: '一張可發布的社群主圖',
-    icon: 'art', steps: ['art'], qualityTarget: 58, reward: 100,
+    icon: 'art', sequenceMode: 'ordered', steps: ['art'], qualityTarget: 58, reward: 100,
     addOns: ['再做一個尺寸', '背景透明'],
   },
   {
@@ -122,7 +124,7 @@ export const v1Recipes: RecipeData[] = [
     purpose: '恢復產品的正常使用',
     action: '定位問題並修正程式錯誤',
     result: '可正常運作的修正版',
-    icon: 'code', steps: ['code'], qualityTarget: 62, reward: 110,
+    icon: 'code', sequenceMode: 'ordered', steps: ['code'], qualityTarget: 62, reward: 110,
     addOns: ['順便加按鈕', '補一個測試'],
   },
   {
@@ -130,7 +132,7 @@ export const v1Recipes: RecipeData[] = [
     purpose: '讓文章內容可核對且值得信任',
     action: '搜尋可靠來源後整理成文',
     result: '一篇附有依據的核對文章',
-    icon: 'research', steps: ['search', 'text'], qualityTarget: 68, reward: 180,
+    icon: 'research', sequenceMode: 'ordered', steps: ['search', 'text'], qualityTarget: 68, reward: 180,
     addOns: ['補上來源'],
   },
   {
@@ -138,7 +140,7 @@ export const v1Recipes: RecipeData[] = [
     purpose: '把零散資料整理成易讀內容',
     action: '編排文件並撰寫重點摘要',
     result: '一份可交付的 PDF 報告',
-    icon: 'report', steps: ['document', 'text'], qualityTarget: 70, reward: 185,
+    icon: 'report', sequenceMode: 'flexible', steps: ['document', 'text'], qualityTarget: 70, reward: 185,
     addOns: ['再附圖表'],
   },
   {
@@ -146,7 +148,7 @@ export const v1Recipes: RecipeData[] = [
     purpose: '讓活動資訊可在線上公開瀏覽',
     action: '撰寫頁面、完成程式並部署',
     result: '一個可開啟的活動網站',
-    icon: 'site', steps: ['text', 'code', 'deploy'], qualityTarget: 70, reward: 270,
+    icon: 'site', sequenceMode: 'ordered', steps: ['text', 'code', 'deploy'], qualityTarget: 70, reward: 270,
     addOns: ['手機也要完美'],
   },
   {
@@ -154,7 +156,7 @@ export const v1Recipes: RecipeData[] = [
     purpose: '快速展示歌曲的內容與方向',
     action: '撰寫內容、編曲並錄製試聽',
     result: '一段可播放的歌曲試聽帶',
-    icon: 'audio', steps: ['text', 'music', 'recording'], qualityTarget: 72, reward: 300,
+    icon: 'audio', sequenceMode: 'ordered', steps: ['text', 'music', 'recording'], qualityTarget: 72, reward: 300,
     addOns: ['副歌再一次'],
   },
   {
@@ -162,7 +164,7 @@ export const v1Recipes: RecipeData[] = [
     purpose: '用短片傳達活動重點',
     action: '製作視覺、拍攝素材並剪輯',
     result: '一支可發布的活動短片',
-    icon: 'video', steps: ['art', 'studio', 'video'], qualityTarget: 74, reward: 340,
+    icon: 'video', sequenceMode: 'ordered', steps: ['art', 'studio', 'video'], qualityTarget: 74, reward: 340,
     addOns: ['加上直式版本'],
   },
   {
@@ -170,7 +172,7 @@ export const v1Recipes: RecipeData[] = [
     purpose: '把研究成果轉成可使用的產品',
     action: '查證、整理、開發並部署',
     result: '一個可上線的資料產品',
-    icon: 'data-product', steps: ['search', 'document', 'code', 'deploy'], qualityTarget: 76, reward: 420,
+    icon: 'data-product', sequenceMode: 'ordered', steps: ['search', 'document', 'code', 'deploy'], qualityTarget: 76, reward: 420,
     addOns: ['再做監控頁'],
   },
   {
@@ -178,7 +180,7 @@ export const v1Recipes: RecipeData[] = [
     purpose: '完成可正式發布的歌曲企劃',
     action: '寫作、編曲、錄音並製作封面',
     result: '一首完整歌曲與封面',
-    icon: 'song', steps: ['text', 'music', 'recording', 'art'], qualityTarget: 78, reward: 520,
+    icon: 'song', sequenceMode: 'flexible', steps: ['text', 'music', 'recording', 'art'], qualityTarget: 78, reward: 520,
     addOns: ['這真的是最後一版'],
   },
   {
@@ -186,7 +188,7 @@ export const v1Recipes: RecipeData[] = [
     purpose: '建立可供使用者操作的線上服務',
     action: '研究、規劃、撰寫、開發並部署',
     result: '一個可運作的產品平台',
-    icon: 'platform', steps: ['search', 'document', 'text', 'code', 'deploy'], qualityTarget: 80, reward: 610,
+    icon: 'platform', sequenceMode: 'ordered', steps: ['search', 'document', 'text', 'code', 'deploy'], qualityTarget: 80, reward: 610,
     addOns: ['臨時改商業模式'],
   },
   {
@@ -194,7 +196,7 @@ export const v1Recipes: RecipeData[] = [
     purpose: '完成歌曲與影像的一體化發布',
     action: '製作歌曲、封面、拍攝並剪輯',
     result: '一首完整歌曲與一支 MV',
-    icon: 'song-mv', steps: ['text', 'music', 'recording', 'art', 'studio', 'video'], qualityTarget: 84, reward: 820,
+    icon: 'song-mv', sequenceMode: 'flexible', steps: ['text', 'music', 'recording', 'art', 'studio', 'video'], qualityTarget: 84, reward: 820,
     addOns: ['再輸出三種格式'],
   },
 ];
@@ -253,6 +255,6 @@ export const v1Upgrades: UpgradeData[] = [
   { id: 'context', name: '條件記憶窗', category: 'model', era: 2, cost: 210, maxLevel: 4, effect: 'Context +18', tradeoff: '處理速度 -2%' },
   { id: 'server', name: '平台伺服器', category: 'hardware', era: 2, cost: 230, maxLevel: 5, effect: '伺服器容量 +20' },
   { id: 'case-slot', name: '額外資料暫存槽', category: 'workflow', era: 3, cost: 420, maxLevel: 2, effect: '可多暫存一個資料箱' },
-  { id: 'agent', name: '流程 Agent', category: 'agent', era: 4, cost: 650, maxLevel: 3, effect: '自動處理指定單步工作', tradeoff: '持續占用 RAM 與伺服器' },
+  { id: 'agent', name: '流程 Agent', category: 'agent', era: 4, cost: 650, maxLevel: 3, effect: '可見跟隨助手；Era 4 最多 2 台並行，Era 5 且 Lv2 起最多 3 台並加速處理', tradeoff: '持續占用 RAM 與伺服器' },
   { id: 'stability', name: '穩定度微調', category: 'model', era: 2, cost: 260, maxLevel: 4, effect: '降低過載錯誤 8%' },
 ];

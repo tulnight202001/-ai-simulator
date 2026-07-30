@@ -2,29 +2,32 @@ import Phaser from 'phaser';
 import type { Career } from '../core/career';
 import { SeededRandom } from '../core/random';
 import {
-  agentCanProcess,
   answerAddOn,
   createProjectQueue,
   createProject,
+  decideCustomer,
   decideNextProject,
+  delegateActiveProject,
   deliverActiveProject,
+  deliverDelegatedProject,
   enqueueProject,
+  isProjectStepComplete,
   offerAddOn,
   outstandingProjects,
   peekNextProject,
   processProject,
   processingMs,
+  reclaimDelegatedProject,
   runtimeLevel,
   tickProjectQueue,
   upgradeEffects,
   validateProjectStep,
-  type AgentState,
   type CustomerDecision,
   type ProjectBox,
   type ProjectQueue,
 } from '../core/v1Runtime';
 import type { ModelDefinition, ResourceKey } from '../data/content';
-import type { WorkstationData } from '../data/v1Catalog';
+import type { WorkstationData, WorkstationId } from '../data/v1Catalog';
 import { getCustomerArtPath, getEraBackgroundPath, getModelArtPath, getStationArtPath } from '../data/artCatalog';
 
 export interface RunResult {
@@ -72,6 +75,29 @@ interface StepIconView {
   spread: number;
 }
 
+interface StationJob {
+  box: ProjectBox;
+  view: StationView;
+  owner: 'player' | 'agent';
+  startedAt: number;
+  endsAt: number;
+  folder: Phaser.GameObjects.Container;
+  folderIcons: StepIconView[];
+  complete: boolean;
+}
+
+interface HelperAgentView {
+  container: Phaser.GameObjects.Container;
+  avatar: Phaser.GameObjects.Image;
+  folder: Phaser.GameObjects.Container;
+  folderIcons: StepIconView[];
+  selectionRing: Phaser.GameObjects.Arc;
+  stateText: Phaser.GameObjects.Text;
+  box?: ProjectBox;
+  busy: boolean;
+  selected: boolean;
+}
+
 const GAME_WIDTH = 540;
 const GAME_HEIGHT = 960;
 const RESOURCE_KEYS: ResourceKey[] = ['cpu', 'gpu', 'ram', 'context', 'server'];
@@ -82,19 +108,19 @@ const RESOURCE_LABELS: Record<ResourceKey, string> = {
   context: 'CTX',
   server: 'NET',
 };
-const STATION_COLORS: Record<string, number> = {
-  counter: 0xffcf66,
-  text: 0x49e4ff,
-  search: 0x42f5c5,
-  document: 0x7cf2a7,
-  art: 0xe95cff,
-  music: 0xa879ff,
-  recording: 0xff6b70,
-  studio: 0xffb84d,
-  video: 0x4a9dff,
-  code: 0xff9f43,
-  deploy: 0x41d9ff,
-};
+const STATION_COLORS = {
+  counter: 0xffd166,
+  text: 0x57d7ff,
+  search: 0xb6f04a,
+  document: 0x46e09a,
+  art: 0xff5db1,
+  music: 0xc56cff,
+  recording: 0xff5864,
+  studio: 0xff9f43,
+  video: 0x4f78ff,
+  code: 0xf2f5ff,
+  deploy: 0x3be2d0,
+} satisfies Record<WorkstationData['id'], number>;
 const STATION_SHORT_LABELS = {
   counter: '需求櫃台',
   text: '文字寫作',
@@ -107,6 +133,19 @@ const STATION_SHORT_LABELS = {
   video: '影片剪輯',
   code: '程式開發',
   deploy: '部署伺服器',
+} satisfies Record<WorkstationData['id'], string>;
+const STATION_OUTPUT_LABELS = {
+  counter: '專案資料夾',
+  text: '文字稿',
+  search: '查證資料',
+  document: '文件／表格',
+  art: '圖像素材',
+  music: '音樂編曲',
+  recording: '錄音素材',
+  studio: '拍攝素材',
+  video: '完成影片',
+  code: '程式成果',
+  deploy: '上線版本',
 } satisfies Record<WorkstationData['id'], string>;
 
 export class WorkstationScene extends Phaser.Scene {
@@ -126,9 +165,14 @@ export class WorkstationScene extends Phaser.Scene {
   private actionButton!: Phaser.GameObjects.Container;
   private skillButton!: Phaser.GameObjects.Container;
   private dashButton!: Phaser.GameObjects.Container;
+  private agentButton?: Phaser.GameObjects.Container;
+  private agentButtonLabel?: Phaser.GameObjects.Text;
   private joystickKnob!: Phaser.GameObjects.Arc;
   private decision?: Phaser.GameObjects.Container;
+  private orderDetail?: Phaser.GameObjects.Container;
   private decisionProjectId?: string;
+  private addOnBox?: ProjectBox;
+  private addOnSource?: 'player' | 'agent';
   private nearby?: StationView;
   private readonly projectQueue: ProjectQueue;
   private processing = false;
@@ -154,9 +198,9 @@ export class WorkstationScene extends Phaser.Scene {
   private joystickPointerId?: number;
   private moveTarget?: { x: number; y: number; view: StationView };
   private movePath: Array<{ x: number; y: number }> = [];
-  private activeStation?: StationView;
-  private processStartedAt = 0;
-  private processEndsAt = 0;
+  private readonly stationJobs = new Map<WorkstationId, StationJob>();
+  private helperAgent?: HelperAgentView;
+  private readonly maxParallelJobs: number;
   private dashUntil = 0;
   private dashReadyAt = 0;
   private skillReadyAt = 0;
@@ -166,7 +210,6 @@ export class WorkstationScene extends Phaser.Scene {
   private readonly runtime;
   private readonly effects;
   private readonly rng;
-  private readonly agent: AgentState;
   private audioContext?: AudioContext;
 
   constructor(
@@ -182,12 +225,11 @@ export class WorkstationScene extends Phaser.Scene {
     this.effects = upgradeEffects(career);
     this.projectQueue = createProjectQueue(this.runtime.maxQueue);
     this.rng = new SeededRandom(seed);
-    this.agent = {
-      assignment: career.agent.assignment,
-      busy: false,
-      cooldownUntil: 0,
-      load: 0,
-    };
+    this.maxParallelJobs = Math.min(3, Math.max(
+      this.effects.caseSlots,
+      this.effects.agentLevel > 0 ? 2 : 1,
+      this.effects.agentLevel >= 2 && this.runtime.era >= 5 ? 3 : 1,
+    ));
   }
 
   preload() {
@@ -210,6 +252,7 @@ export class WorkstationScene extends Phaser.Scene {
     this.makeCustomers();
     this.makeStations();
     this.makePlayer();
+    this.makeHelperAgent();
     this.makeControls();
     this.bindKeyboard();
     this.time.addEvent({ delay: 1000, loop: true, callback: () => this.tick() });
@@ -241,7 +284,8 @@ export class WorkstationScene extends Phaser.Scene {
     }
 
     this.findNearbyStation();
-    this.updateProcessingBar();
+    this.updateStationJobs();
+    this.updateHelperAgent(delta);
     this.updateControlState();
   }
 
@@ -351,8 +395,14 @@ export class WorkstationScene extends Phaser.Scene {
     const patienceFill = this.add.rectangle(-66, 40, 132, 8, 0x59e7d2, 1).setOrigin(0, 0.5);
     const container = this.add
       .container(x, 132, [frame, badge, title, state, ...iconSlots.map((slot) => slot.container), patienceBack, patienceFill])
+      .setSize(160, 98)
       .setDepth(1200)
-      .setVisible(false);
+      .setVisible(false)
+      .setInteractive({ useHandCursor: true });
+    container.on('pointerdown', () => {
+      const order = this.outstandingOrders()[index];
+      if (order) this.showOrderDetails(order);
+    });
     this.orderCards.push({ container, frame, title, state, iconSlots, patienceFill });
   }
 
@@ -536,7 +586,7 @@ export class WorkstationScene extends Phaser.Scene {
       }
       icon.container.setVisible(true).setPosition(isMore ? spread : positions[index] ?? 0, icon.container.y);
       icon.glyph.setVisible(!isMore);
-      icon.check.setVisible(Boolean(step && index < box.stage));
+      icon.check.setVisible(Boolean(step && isProjectStepComplete(box, step)));
       icon.more.setVisible(isMore).setText(isMore ? `+${steps.length - 2}` : '');
       if (isMore) {
         icon.plate.setFillStyle(0x1b1533, 0.98).setStrokeStyle(Math.max(1, icon.size * 0.08), 0xb799ff, 0.88);
@@ -548,8 +598,8 @@ export class WorkstationScene extends Phaser.Scene {
         return;
       }
       const color = STATION_COLORS[step.stationId] ?? 0x8edfff;
-      const complete = index < box.stage;
-      const active = index === box.stage;
+      const complete = isProjectStepComplete(box, step);
+      const active = box.recipe.sequenceMode === 'ordered' ? index === box.stage : !complete;
       icon.plate
         .setFillStyle(0x061421, 0.98)
         .setStrokeStyle(Math.max(1, icon.size * (active ? 0.12 : 0.08)), color, active ? 1 : 0.76);
@@ -593,13 +643,13 @@ export class WorkstationScene extends Phaser.Scene {
       view.patienceFill.width = 76 * patienceRatio;
       view.patienceFill.fillColor = patienceRatio < 0.25 ? 0xff6f61 : patienceRatio < 0.5 ? 0xffc45f : 0x62ead5;
       view.alert.setVisible(patienceRatio < 0.3);
-      view.folder.setScale(0.86 * position.scale).setVisible(index > 0 || !order.accepted);
+      view.folder.setScale(0.86 * position.scale).setVisible(!order.accepted);
       this.updateFolderIcons(view.folderIcons, order);
     });
   }
 
-  private advanceCustomerQueue() {
-    const leaving = this.customerViews.shift();
+  private advanceCustomerQueue(index = 0) {
+    const [leaving] = this.customerViews.splice(Math.max(0, index), 1);
     if (!leaving) return;
     leaving.container.setVisible(false);
     leaving.folder.setVisible(false);
@@ -619,6 +669,14 @@ export class WorkstationScene extends Phaser.Scene {
         .setStrokeStyle(1, color, 0.16);
       const sprite = this.add.image(0, isCounter ? 0 : compact ? -5 : -12, `station-${station.id}-v3`);
       this.fitImage(sprite, isCounter ? 492 : compact ? 136 : 142, isCounter ? 126 : compact ? 58 : 92);
+      const iconPanelY = isCounter ? -46 : compact ? -7 : -17;
+      const iconPanelWidth = isCounter ? 112 : compact ? 68 : 78;
+      const iconPanelHeight = isCounter ? 44 : compact ? 42 : 52;
+      const iconPanel = this.add
+        .rectangle(0, iconPanelY, iconPanelWidth, iconPanelHeight, 0x020611, 0.9)
+        .setStrokeStyle(3, color, 1);
+      const iconGlyph = this.add.graphics().setPosition(0, iconPanelY);
+      this.drawStationGlyph(iconGlyph, station.id, isCounter ? 54 : compact ? 56 : 64, color);
       const labelY = isCounter ? 36 : compact ? 18 : 19;
       const labelWidth = isCounter ? 164 : compact ? 128 : 132;
       const labelHeight = isCounter ? 28 : compact ? 20 : 24;
@@ -638,7 +696,7 @@ export class WorkstationScene extends Phaser.Scene {
       const progressBack = this.add.rectangle(-48, progressY, 96, 5, 0x07101e, 0.92).setOrigin(0, 0.5);
       const progress = this.add.rectangle(-48, progressY, 0, 5, color, 1).setOrigin(0, 0.5);
       const container = this.add
-        .container(x, y, [frame, sprite, labelPlate, label, progressBack, progress])
+        .container(x, y, [frame, sprite, iconPanel, iconGlyph, labelPlate, label, progressBack, progress])
         .setSize(hitWidth, hitHeight)
         .setDepth(isCounter ? 410 : y)
         .setInteractive({ useHandCursor: true });
@@ -693,6 +751,45 @@ export class WorkstationScene extends Phaser.Scene {
     this.tweens.add({ targets: this.playerAvatar, y: -32, duration: 900, ease: 'Sine.InOut', yoyo: true, repeat: -1 });
   }
 
+  private makeHelperAgent() {
+    if (this.effects.agentLevel < 1) return;
+    const selectionRing = this.add
+      .circle(0, 42, 40, 0x9f7cff, 0.12)
+      .setStrokeStyle(3, 0xc6afff, 0.95)
+      .setVisible(false);
+    const shadow = this.add.ellipse(0, 40, 58, 18, 0x000000, 0.38);
+    const avatar = this.add.image(0, -16, `ai-${this.model.id}-v2`).setAlpha(0.9).setTint(0xcbb8ff);
+    this.fitImage(avatar, 78, 104);
+    const folderVisual = this.makeFolderVisual(48, 35);
+    const folder = folderVisual.container.setPosition(29, 2).setAngle(-8).setVisible(false);
+    const stateText = this.add
+      .text(0, -82, 'AGENT 待命', {
+        fontSize: '11px',
+        fontStyle: 'bold',
+        color: '#efeaff',
+        backgroundColor: '#251d42dd',
+        padding: { x: 7, y: 3 },
+      })
+      .setOrigin(0.5);
+    const container = this.add
+      .container(this.player.x - 58, this.player.y + 36, [selectionRing, shadow, avatar, folder, stateText])
+      .setSize(90, 118)
+      .setDepth(this.player.y + 36)
+      .setInteractive({ useHandCursor: true });
+    this.helperAgent = {
+      container,
+      avatar,
+      folder,
+      folderIcons: folderVisual.icons,
+      selectionRing,
+      stateText,
+      busy: false,
+      selected: false,
+    };
+    container.on('pointerdown', () => this.toggleHelperAgent());
+    this.tweens.add({ targets: avatar, y: -20, duration: 820, ease: 'Sine.InOut', yoyo: true, repeat: -1 });
+  }
+
   private fitImage(image: Phaser.GameObjects.Image, maxWidth: number, maxHeight: number) {
     const scale = Math.min(maxWidth / Math.max(1, image.width), maxHeight / Math.max(1, image.height));
     image.setScale(scale);
@@ -720,6 +817,10 @@ export class WorkstationScene extends Phaser.Scene {
 
     this.dashButton = this.makeRoundButton(340, 916, 32, '➤', '衝刺', 0x274a66, () => this.dash());
     this.skillButton = this.makeRoundButton(370, 850, 34, this.model.glyph, this.model.skillName, this.model.color, () => this.activateSkill());
+    if (this.helperAgent) {
+      this.agentButton = this.makeRoundButton(258, 890, 34, 'A', '交給', 0x9f7cff, () => this.toggleHelperAgent());
+      this.agentButtonLabel = this.agentButton.getAt(3) as Phaser.GameObjects.Text;
+    }
     this.actionButton = this.makeRoundButton(466, 890, 52, 'E', '互動', 0x0f8ea3, () => this.interact());
     this.actionLabel = this.actionButton.getAt(3) as Phaser.GameObjects.Text;
   }
@@ -749,6 +850,58 @@ export class WorkstationScene extends Phaser.Scene {
     return container;
   }
 
+  private toggleHelperAgent() {
+    const helper = this.helperAgent;
+    if (!helper || helper.busy || this.folderInTransit || this.finished) return;
+    if (!helper.box) {
+      if (!this.projectQueue.active) {
+        helper.selected = false;
+        this.setStatus('Agent 正在待命；接單後可把資料夾交給它。');
+        return;
+      }
+      const delegated = delegateActiveProject(this.projectQueue, this.maxParallelJobs);
+      if (!delegated.ok) return;
+      helper.box = delegated.project;
+      helper.selected = true;
+      helper.folder.setVisible(true);
+      this.updateFolderIcons(helper.folderIcons, delegated.project);
+      this.setStatus(`已把「${delegated.project.recipe.name}」交給 Agent；點任意機台後下指令。`);
+      this.updateHud();
+      return;
+    }
+    helper.selected = !helper.selected;
+    this.setStatus(helper.selected
+      ? `已選取 Agent 的「${helper.box.recipe.name}」；點任意機台下指令。`
+      : '已切回玩家手上的資料夾。');
+    this.updateHud();
+  }
+
+  private updateHelperAgent(delta: number) {
+    const helper = this.helperAgent;
+    if (!helper) return;
+    if (!helper.busy) {
+      const side = this.player.x < GAME_WIDTH / 2 ? 1 : -1;
+      const targetX = Phaser.Math.Clamp(this.player.x + side * 58, 45, 495);
+      const targetY = Phaser.Math.Clamp(this.player.y + 38, 450, 785);
+      const follow = Math.min(1, delta * 0.0075);
+      helper.container.x = Phaser.Math.Linear(helper.container.x, targetX, follow);
+      helper.container.y = Phaser.Math.Linear(helper.container.y, targetY, follow);
+    }
+    helper.container.setDepth(Math.round(helper.container.y));
+    helper.selectionRing.setVisible(helper.selected);
+    helper.folder.setVisible(Boolean(helper.box) && !helper.busy);
+    if (helper.box && !helper.busy) this.updateFolderIcons(helper.folderIcons, helper.box);
+    helper.stateText.setText(helper.busy
+      ? 'AGENT 運算中'
+      : helper.box
+        ? `AGENT ${helper.box.stage}/${helper.box.recipe.runtimeSteps.length}`
+        : 'AGENT 待命');
+    if (this.agentButtonLabel) {
+      this.agentButtonLabel.setText(helper.busy ? '忙碌' : helper.box ? helper.selected ? '已選' : '指令' : '交給');
+    }
+    this.agentButton?.setAlpha(helper.busy ? 0.55 : 1);
+  }
+
   private bindKeyboard() {
     const keyboard = this.input.keyboard!;
     this.keys = keyboard.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E,SPACE,Q,SHIFT') as Record<string, Phaser.Input.Keyboard.Key>;
@@ -776,7 +929,7 @@ export class WorkstationScene extends Phaser.Scene {
   }
 
   private goToStation(view: StationView) {
-    if (this.decision || this.finished || this.left <= 0) return;
+    if (this.decision || this.orderDetail || this.finished || this.left <= 0) return;
     if (this.moveTarget && this.moveTarget.view !== view) {
       const previousColor = STATION_COLORS[this.moveTarget.view.data.id] ?? 0x65d9e8;
       this.moveTarget.view.frame.setStrokeStyle(1, previousColor, 0.16);
@@ -799,7 +952,7 @@ export class WorkstationScene extends Phaser.Scene {
   }
 
   private updateAutoMovement(delta: number) {
-    if (!this.moveTarget || this.decision) return;
+    if (!this.moveTarget || this.decision || this.orderDetail) return;
     const waypoint = this.movePath[0] ?? this.moveTarget;
     const dx = waypoint.x - this.player.x;
     const dy = waypoint.y - this.player.y;
@@ -886,15 +1039,101 @@ export class WorkstationScene extends Phaser.Scene {
     }
   }
 
+  private showOrderDetails(order: ProjectBox) {
+    if (this.decision || this.orderDetail || this.finished) return;
+    this.cancelAutoMovement();
+    const veil = this.add.rectangle(270, 480, 540, 960, 0x020611, 0.78).setInteractive();
+    const panel = this.add.rectangle(0, 0, 500, 700, 0x071323, 0.995).setStrokeStyle(3, 0x70e3ed, 0.9);
+    const title = this.add
+      .text(0, -316, order.recipe.name, { fontSize: '24px', fontStyle: 'bold', color: '#ffffff', align: 'center' })
+      .setOrigin(0.5);
+    const customer = this.add
+      .text(0, -281, `${order.customer.name}　耐心 ${Math.round(order.patience)}`, { fontSize: '13px', color: '#9fc8d9', align: 'center' })
+      .setOrigin(0.5);
+    const modeText = order.recipe.sequenceMode === 'ordered'
+      ? '固定順序　依 1 → 2 → 3 完成'
+      : '自由順序　所有項目完成即可';
+    const mode = this.add
+      .text(0, -247, modeText, {
+        fontSize: '14px',
+        fontStyle: 'bold',
+        color: order.recipe.sequenceMode === 'ordered' ? '#ffd166' : '#73efe4',
+        backgroundColor: '#13243b',
+        padding: { x: 12, y: 6 },
+      })
+      .setOrigin(0.5);
+    const purpose = this.add
+      .text(-220, -207, `目的｜${order.recipe.purpose}`, { fontSize: '13px', color: '#dff9ff', wordWrap: { width: 440 } })
+      .setOrigin(0, 0);
+    const action = this.add
+      .text(-220, -169, `要做｜${order.recipe.action}`, { fontSize: '13px', color: '#dff9ff', wordWrap: { width: 440 } })
+      .setOrigin(0, 0);
+    const result = this.add
+      .text(-220, -131, `交付｜${order.recipe.result}`, { fontSize: '13px', fontStyle: 'bold', color: '#ffe28a', wordWrap: { width: 440 } })
+      .setOrigin(0, 0);
+    const children: Phaser.GameObjects.GameObject[] = [veil, panel, title, customer, mode, purpose, action, result];
+    const stepStartY = -68;
+    order.recipe.runtimeSteps.slice(0, 6).forEach((step, index) => {
+      const rowY = stepStartY + index * 49;
+      const color = STATION_COLORS[step.stationId];
+      const complete = isProjectStepComplete(order, step);
+      const icon = this.makeStepIcon(34, 0);
+      icon.container.setPosition(-205, rowY).setVisible(true).setAlpha(complete ? 0.62 : 1);
+      icon.plate.setFillStyle(0x061421, 1).setStrokeStyle(3, color, 1);
+      this.drawStationGlyph(icon.glyph, step.stationId, 34, color);
+      icon.check.setVisible(complete);
+      const number = this.add
+        .text(-166, rowY, order.recipe.sequenceMode === 'ordered' ? `${index + 1}` : '•', {
+          fontSize: '15px', fontStyle: 'bold', color: '#ffffff',
+        })
+        .setOrigin(0.5);
+      const station = this.add
+        .text(-145, rowY - 10, STATION_SHORT_LABELS[step.stationId], { fontSize: '14px', fontStyle: 'bold', color: '#ffffff' })
+        .setOrigin(0, 0.5);
+      const output = this.add
+        .text(-145, rowY + 11, STATION_OUTPUT_LABELS[step.stationId], { fontSize: '11px', color: '#8fb5c8' })
+        .setOrigin(0, 0.5);
+      const state = complete
+        ? '已完成'
+        : order.recipe.sequenceMode === 'flexible'
+          ? '可自由安排'
+          : index === order.stage
+            ? '目前工序'
+            : '後續工序';
+      const stateText = this.add
+        .text(214, rowY, state, { fontSize: '11px', fontStyle: 'bold', color: complete ? '#69e6a7' : '#b6d6e5' })
+        .setOrigin(1, 0.5);
+      children.push(icon.container, number, station, output, stateText);
+    });
+    const impact = order.decisionImpact
+      ? `${order.decisionImpact.label}｜${order.decisionImpact.summary}`
+      : '尚未接單｜前往櫃檯選擇處理方式';
+    const footer = this.add
+      .text(0, 249, `${impact}\n報酬 ${order.recipe.reward}　品質門檻 ${order.recipe.qualityTarget}`, {
+        fontSize: '12px', color: '#c9e9f4', align: 'center', wordWrap: { width: 430 },
+      })
+      .setOrigin(0.5);
+    const close = this.add.rectangle(0, 312, 190, 50, 0x174158, 1).setStrokeStyle(2, 0x6cece5, 0.7).setInteractive({ useHandCursor: true });
+    const closeText = this.add.text(0, 312, '關閉訂單詳情', { fontSize: '14px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
+    children.push(footer, close, closeText);
+    const closeDetails = () => {
+      this.orderDetail?.destroy();
+      this.orderDetail = undefined;
+    };
+    close.on('pointerdown', closeDetails);
+    veil.on('pointerdown', closeDetails);
+    this.orderDetail = this.add.container(270, 480, children).setDepth(2200);
+  }
+
   private showDecision() {
     if (!this.box || this.box.accepted || this.decision) return;
     this.decisionProjectId = this.box.id;
-    const choices: Array<[string, CustomerDecision, string]> = [
-      ['接受', 'accept', '直接開工'],
-      ['追問', 'question', '補齊需求'],
-      ['限制作法', 'limits', '先說清楚'],
-      ['替代方案', 'alternative', '換條路'],
-      ['拒絕', 'reject', '保住算力'],
+    const choices: Array<[string, CustomerDecision]> = [
+      ['接受原單', 'accept'],
+      ['追問規格', 'question'],
+      ['限制範圍', 'limits'],
+      ['替代方案', 'alternative'],
+      ['拒絕委託', 'reject'],
     ];
     const veil = this.add.rectangle(270, 480, 540, 960, 0x020611, 0.68).setInteractive();
     const panel = this.add.rectangle(0, 0, 500, 470, 0x071323, 0.99).setStrokeStyle(2, 0x70e3ed, 0.85);
@@ -904,14 +1143,18 @@ export class WorkstationScene extends Phaser.Scene {
     const action = this.add.text(-218, -74, `➜ 動作　${this.box.recipe.action}`, { fontSize: '14px', color: '#dcf8ff', wordWrap: { width: 438 } }).setOrigin(0, 0.5);
     const outcome = this.add.text(-218, -32, `◆ 成果　${this.box.recipe.result}`, { fontSize: '14px', color: '#ffe28a', wordWrap: { width: 438 } }).setOrigin(0, 0.5);
     const children: Phaser.GameObjects.GameObject[] = [veil, panel, title, subtitle, purpose, action, outcome];
-    choices.forEach(([label, value, detail], index) => {
+    choices.forEach(([label, value], index) => {
+      const preview = decideCustomer(structuredClone(this.box!), value).impact;
+      const detail = preview.details.slice(0, 2).join('｜');
       const row = Math.floor(index / 2);
       const column = index % 2;
       const x = index === 4 ? 0 : -120 + column * 240;
       const y = 42 + row * 78;
       const button = this.add.rectangle(x, y, index === 4 ? 220 : 205, 58, 0x173653, 1).setStrokeStyle(2, 0x5ca9c4, 0.55).setInteractive({ useHandCursor: true });
       const buttonText = this.add.text(x, y - 8, label, { fontSize: '17px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
-      const detailText = this.add.text(x, y + 14, detail, { fontSize: '12px', color: '#9fc9da' }).setOrigin(0.5);
+      const detailText = this.add
+        .text(x, y + 14, detail, { fontSize: '10px', color: '#9fc9da', align: 'center', wordWrap: { width: index === 4 ? 205 : 188 } })
+        .setOrigin(0.5);
       button.on('pointerdown', () => this.choose(value));
       children.push(button, buttonText, detailText);
     });
@@ -939,13 +1182,12 @@ export class WorkstationScene extends Phaser.Scene {
     this.tone(result.accepted ? 640 : 220, 0.08);
     if (!result.accepted) {
       this.advanceCustomerQueue();
-      this.setStatus(`${result.message}，滿意度 ${result.satisfaction >= 0 ? '+' : ''}${result.satisfaction}`);
+      this.setStatus(`${result.impact.label}｜${result.impact.details.join('・')}`);
       this.nextArrivalIn = Math.min(this.nextArrivalIn, 2);
     } else {
       this.loads.context += 15;
       this.animateFolderHandoff(result.project);
-      this.setStatus(`${result.message}。資料夾已交到你手上，請自行比對委託的顏色與圖案。`);
-      this.maybeAgent();
+      this.setStatus(`${result.impact.label}｜${result.impact.details.slice(0, 2).join('・')}`);
     }
     this.updateHud();
   }
@@ -975,37 +1217,89 @@ export class WorkstationScene extends Phaser.Scene {
   }
 
   private interact() {
-    if (this.decision || this.finished || this.left <= 0) return;
+    if (this.decision || this.orderDetail || this.finished || this.left <= 0) return;
     if (!this.nearby) return;
     if (this.processing) return;
+    const stationJob = this.stationJobs.get(this.nearby.data.id);
+    if (stationJob) {
+      if (stationJob.complete && stationJob.owner === 'player' && !this.projectQueue.active) {
+        this.reclaimStationJob(stationJob);
+      }
+      return;
+    }
     if (this.nearby.data.id === 'counter') {
+      if (this.helperAgent?.selected && this.helperAgent.box) {
+        if (this.helperAgent.box.complete) this.deliverHelperProject();
+        return;
+      }
       if (!this.box) return;
       if (!this.box.accepted) {
         this.showDecision();
         return;
       }
       if (!this.box.complete) return;
-      if (this.box.addOn && !this.box.addOn.accepted) {
-        this.showAddOn();
+      if (this.box.addOn?.accepted === undefined) {
+        this.showAddOn(this.box, 'player');
         return;
       }
       this.deliver();
       return;
     }
-    if (!this.box?.accepted) return;
-    const result = validateProjectStep(this.box, this.nearby.data.id);
+    if (this.helperAgent?.selected && this.helperAgent.box && !this.helperAgent.busy) {
+      const result = validateProjectStep(this.helperAgent.box, this.nearby.data.id);
+      if (!result.ok) return;
+      this.startStationJob(this.helperAgent.box, this.nearby, 'agent');
+      return;
+    }
+    const playerBox = this.projectQueue.active;
+    if (!playerBox?.accepted) return;
+    const result = validateProjectStep(playerBox, this.nearby.data.id);
     if (!result.ok) return;
-    this.startProcessing(this.nearby);
+    this.startStationJob(playerBox, this.nearby, 'player');
   }
 
-  private startProcessing(view: StationView) {
-    const duration = processingMs(view.data, this.model, this.loads.server, this.effects);
-    this.processing = true;
-    this.activeStation = view;
-    this.processStartedAt = this.time.now;
-    this.processEndsAt = this.time.now + duration;
+  private startStationJob(box: ProjectBox, view: StationView, owner: 'player' | 'agent') {
+    if (this.stationJobs.has(view.data.id) || this.stationJobs.size >= this.maxParallelJobs) return;
+    if (owner === 'player') {
+      const delegated = delegateActiveProject(this.projectQueue, this.maxParallelJobs);
+      if (!delegated.ok || delegated.project.id !== box.id) return;
+    } else if (!this.helperAgent || this.helperAgent.box?.id !== box.id) {
+      return;
+    }
+    const baseDuration = processingMs(view.data, this.model, this.loads.server, this.effects);
+    const agentSpeed = owner === 'agent' ? 1 + this.effects.agentLevel * 0.18 : 1;
+    const duration = baseDuration / agentSpeed;
     this.loads[view.data.resource] += view.data.cost;
-    this.loads.server += 18;
+    this.loads.server += owner === 'agent' ? 22 : 18;
+    const folderVisual = this.makeFolderVisual(50, 36);
+    const folder = folderVisual.container
+      .setPosition(view.container.x, view.container.y - 8)
+      .setDepth(view.container.depth + 8);
+    this.updateFolderIcons(folderVisual.icons, box);
+    const job: StationJob = {
+      box,
+      view,
+      owner,
+      startedAt: this.time.now,
+      endsAt: this.time.now + duration,
+      folder,
+      folderIcons: folderVisual.icons,
+      complete: false,
+    };
+    this.stationJobs.set(view.data.id, job);
+    view.progress.width = 0;
+    if (owner === 'agent' && this.helperAgent) {
+      this.helperAgent.busy = true;
+      this.helperAgent.selected = false;
+      this.helperAgent.folder.setVisible(false);
+      this.tweens.add({
+        targets: this.helperAgent.container,
+        x: Phaser.Math.Clamp(view.access.x + (view.access.x < GAME_WIDTH / 2 ? -78 : 78), 48, 492),
+        y: Phaser.Math.Clamp(view.access.y + 44, 452, 770),
+        duration: 220,
+        ease: 'Sine.Out',
+      });
+    }
     const workPulse = this.add
       .circle(view.container.x, view.container.y, 24, STATION_COLORS[view.data.id] ?? 0x65d9e8, 0.24)
       .setDepth(view.container.depth + 1);
@@ -1018,40 +1312,75 @@ export class WorkstationScene extends Phaser.Scene {
       onComplete: () => workPulse.destroy(),
     });
     this.tweens.add({ targets: view.container, scale: 1.04, duration: 130, yoyo: true, repeat: 1 });
-    this.setStatus(`${view.data.name} 鎖定資料箱，運算中不可改派`);
+    this.setStatus(`${owner === 'agent' ? 'Agent 已放入' : '已放入'}「${box.recipe.name}」；機台開始獨立運算。`);
     this.tone(420, 0.05);
-    this.time.delayedCall(duration, () => {
-      if (!this.box || this.finished) return;
-      const qualityBonus = this.model.id === 'atlas' && this.time.now < this.skillUntil ? 16 : 0;
-      const result = processProject(this.box, view.data.id, view.data.quality + this.effects.stability * 10 + qualityBonus);
-      this.processing = false;
-      this.activeStation = undefined;
-      view.progress.width = 0;
-      this.loads[view.data.resource] = Math.max(5, this.loads[view.data.resource] - view.data.cost * 0.7);
-      this.loads.server = Math.max(12, this.loads.server - 14);
-      this.score += 40;
-      this.setStatus(this.box.complete
-        ? '所有加工階段完成，請回櫃檯交付。'
-        : '本階段完成，請再次對照資料夾上的顏色與圖案。');
-      this.tone(this.box.complete ? 880 : 620, 0.09);
-      navigator.vibrate?.(this.box.complete ? [20, 25, 20] : 18);
-      this.updateHud();
+    this.updateHud();
+  }
+
+  private updateStationJobs() {
+    this.stationJobs.forEach((job) => {
+      if (job.complete) return;
+      const total = Math.max(1, job.endsAt - job.startedAt);
+      const ratio = Phaser.Math.Clamp((this.time.now - job.startedAt) / total, 0, 1);
+      job.view.progress.width = 96 * ratio;
+      if (ratio >= 1) this.finishStationJob(job);
     });
   }
 
-  private updateProcessingBar() {
-    if (!this.activeStation || !this.processing) return;
-    const total = Math.max(1, this.processEndsAt - this.processStartedAt);
-    const ratio = Phaser.Math.Clamp((this.time.now - this.processStartedAt) / total, 0, 1);
-    this.activeStation.progress.width = 96 * ratio;
+  private finishStationJob(job: StationJob) {
+    if (job.complete || this.finished) return;
+    const agentQuality = job.owner === 'agent' ? -8 + this.effects.agentLevel * 5 : 0;
+    const skillQuality = this.model.id === 'atlas' && this.time.now < this.skillUntil ? 16 : 0;
+    const result = processProject(
+      job.box,
+      job.view.data.id,
+      job.view.data.quality + this.effects.stability * 10 + skillQuality + agentQuality,
+    );
+    if (!result.ok) return;
+    job.complete = true;
+    job.view.progress.width = 96;
+    this.loads[job.view.data.resource] = Math.max(5, this.loads[job.view.data.resource] - job.view.data.cost * 0.7);
+    this.loads.server = Math.max(12, this.loads.server - (job.owner === 'agent' ? 17 : 14));
+    this.score += 40;
+    this.updateFolderIcons(job.folderIcons, job.box);
+    if (job.owner === 'agent' && this.helperAgent) {
+      job.folder.destroy();
+      job.view.progress.width = 0;
+      this.stationJobs.delete(job.view.data.id);
+      this.helperAgent.busy = false;
+      this.helperAgent.box = job.box;
+      this.helperAgent.folder.setVisible(true);
+      this.updateFolderIcons(this.helperAgent.folderIcons, job.box);
+      this.setStatus(`Agent 完成「${STATION_SHORT_LABELS[job.view.data.id]}」，已抱回資料夾。`);
+    } else {
+      job.folder.setAlpha(1).setScale(1.08);
+      this.setStatus(`${STATION_SHORT_LABELS[job.view.data.id]}完成；回到機台取回資料夾。`);
+    }
+    this.tone(job.box.complete ? 880 : 620, 0.09);
+    navigator.vibrate?.(job.box.complete ? [20, 25, 20] : 18);
+    this.updateHud();
   }
 
-  private showAddOn() {
-    if (!this.box?.addOn || this.decision) return;
+  private reclaimStationJob(job: StationJob) {
+    const reclaimed = reclaimDelegatedProject(this.projectQueue, job.box.id);
+    if (!reclaimed.ok) return;
+    job.folder.destroy();
+    job.view.progress.width = 0;
+    this.stationJobs.delete(job.view.data.id);
+    this.setStatus(reclaimed.project.complete
+      ? '已取回完成資料夾；可回櫃檯交付。'
+      : '已取回資料夾；可自行安排下一道工序。');
+    this.updateHud();
+  }
+
+  private showAddOn(box = this.box, source: 'player' | 'agent' = 'player') {
+    if (!box?.addOn || this.decision) return;
+    this.addOnBox = box;
+    this.addOnSource = source;
     const veil = this.add.rectangle(270, 480, 540, 960, 0x020611, 0.68).setInteractive();
     const panel = this.add.rectangle(0, 0, 490, 245, 0x1a1024, 0.99).setStrokeStyle(2, 0xff79c3, 0.85);
     const title = this.add.text(0, -82, '⚠ 客戶追加要求', { fontSize: '19px', fontStyle: 'bold', color: '#ffb6dd' }).setOrigin(0.5);
-    const request = this.add.text(0, -35, `「${this.box.addOn.label}」`, { fontSize: '16px', color: '#ffffff', align: 'center' }).setOrigin(0.5);
+    const request = this.add.text(0, -35, `「${box.addOn.label}」`, { fontSize: '16px', color: '#ffffff', align: 'center' }).setOrigin(0.5);
     const accept = this.add.rectangle(-112, 58, 190, 62, 0x17615e, 1).setStrokeStyle(2, 0x6cf4df, 0.8).setInteractive({ useHandCursor: true });
     const reject = this.add.rectangle(112, 58, 190, 62, 0x532035, 1).setStrokeStyle(2, 0xff8fb6, 0.8).setInteractive({ useHandCursor: true });
     const acceptText = this.add.text(-112, 58, '接受追加\n重新處理', { fontSize: '13px', fontStyle: 'bold', color: '#ffffff', align: 'center' }).setOrigin(0.5);
@@ -1062,24 +1391,34 @@ export class WorkstationScene extends Phaser.Scene {
   }
 
   private answerAddOn(accept: boolean) {
-    if (!this.box) return;
-    const result = answerAddOn(this.box, accept);
+    const box = this.addOnBox;
+    const source = this.addOnSource ?? 'player';
+    if (!box) return;
+    const result = answerAddOn(box, accept);
     this.satisfaction = Phaser.Math.Clamp(this.satisfaction + result.satisfaction, 0, 100);
     this.decision?.destroy();
     this.decision = undefined;
     this.decisionProjectId = undefined;
+    this.addOnBox = undefined;
+    this.addOnSource = undefined;
     this.setStatus(accept ? '已接受追加，資料箱重新開啟！' : '拒絕追加，客戶不太滿意');
-    if (!accept) this.deliver(true);
+    if (!accept) {
+      if (source === 'agent') this.deliverHelperProject(true);
+      else this.deliver(true);
+    }
     this.updateHud();
   }
 
   private deliver(skipAddOn = false) {
     const box = this.projectQueue.active;
     if (!box) return;
-    if (!skipAddOn && offerAddOn(box, this.rng.next())) {
-      this.showAddOn();
-      return;
+    if (!skipAddOn) {
+      if (box.addOn?.accepted === undefined || offerAddOn(box, this.rng.next())) {
+        this.showAddOn(box, 'player');
+        return;
+      }
     }
+    const customerIndex = this.outstandingOrders().findIndex((order) => order.id === box.id);
     this.processing = true;
     this.folderInTransit = true;
     this.carriedBox.setVisible(false);
@@ -1114,43 +1453,86 @@ export class WorkstationScene extends Phaser.Scene {
               if (this.left === 0) this.endRun();
               return;
             }
-            this.advanceCustomerQueue();
-            const average = box.quality / Math.max(1, box.outputs.length);
-            this.score += box.recipe.reward + Math.round(average);
-            this.satisfaction = Math.min(100, this.satisfaction + 5);
-            this.delivered += 1;
-            this.loads.context = Math.max(5, this.loads.context - 15);
-            this.setStatus(`完整交付「${box.recipe.result}」！下一位客戶已往櫃檯前進。`);
-            this.tone(1040, 0.14);
-            navigator.vibrate?.([25, 30, 35]);
-            this.cameras.main.flash(160, 70, 235, 214, false);
-            this.nextArrivalIn = Math.min(this.nextArrivalIn, 2);
-            this.updateHud();
-            if (this.left === 0) this.endRun();
+            this.settleDelivery(box, customerIndex);
           },
         });
       },
     });
   }
 
-  private maybeAgent() {
-    if (!this.box || !agentCanProcess(this.agent, this.box, this.time.now)) return;
-    this.agent.busy = true;
-    this.agent.load = 15;
-    this.loads.ram += 15;
-    this.loads.server += 12;
-    this.setStatus(`Agent 自動接手 ${this.agent.assignment} 單步任務`);
-    this.time.delayedCall(3000 / Math.max(1, this.effects.agentLevel), () => {
-      if (!this.box || this.finished) return;
-      processProject(this.box, this.agent.assignment as 'text' | 'art' | 'code', 65 + this.effects.agentLevel * 5);
-      this.agent.busy = false;
-      this.agent.cooldownUntil = this.time.now + 5000;
-      this.agent.load = 0;
-      this.loads.ram = Math.max(5, this.loads.ram - 10);
-      this.loads.server = Math.max(12, this.loads.server - 8);
-      this.setStatus('Agent 完成輔助處理，進入冷卻');
-      this.updateHud();
+  private deliverHelperProject(skipAddOn = false) {
+    const helper = this.helperAgent;
+    const box = helper?.box;
+    if (!helper || !box || !box.complete || this.processing) return;
+    if (!skipAddOn) {
+      if (box.addOn?.accepted === undefined || offerAddOn(box, this.rng.next())) {
+        this.showAddOn(box, 'agent');
+        return;
+      }
+    }
+    const customerIndex = this.outstandingOrders().findIndex((order) => order.id === box.id);
+    this.processing = true;
+    helper.busy = true;
+    helper.selected = false;
+    helper.folder.setVisible(false);
+    const deliveryFolder = this.makeFolderVisual(58, 42);
+    deliveryFolder.container
+      .setPosition(helper.container.x + 29, helper.container.y + 2)
+      .setAngle(-8)
+      .setDepth(1700);
+    this.updateFolderIcons(deliveryFolder.icons, box);
+    this.setStatus('Agent 把完成資料夾放上交付盤…');
+    this.tweens.add({
+      targets: deliveryFolder.container,
+      x: this.deliveryTray.x,
+      y: this.deliveryTray.y,
+      angle: 0,
+      duration: 300,
+      ease: 'Cubic.Out',
+      onComplete: () => {
+        this.tweens.add({ targets: this.deliveryTray, scale: 1.12, duration: 90, yoyo: true });
+        this.tweens.add({
+          targets: deliveryFolder.container,
+          y: 318,
+          scale: 0.7,
+          alpha: 0,
+          duration: 240,
+          ease: 'Cubic.In',
+          onComplete: () => {
+            deliveryFolder.container.destroy();
+            const deliveredResult = deliverDelegatedProject(this.projectQueue, box.id);
+            this.processing = false;
+            helper.busy = false;
+            if (!deliveredResult.ok) {
+              helper.folder.setVisible(true);
+              helper.selected = true;
+              this.flashStatus(deliveredResult.reason);
+              this.updateHud();
+              if (this.left === 0) this.endRun();
+              return;
+            }
+            helper.box = undefined;
+            this.settleDelivery(box, customerIndex);
+          },
+        });
+      },
     });
+  }
+
+  private settleDelivery(box: ProjectBox, customerIndex: number) {
+    this.advanceCustomerQueue(customerIndex);
+    const average = box.quality / Math.max(1, box.outputs.length);
+    this.score += box.recipe.reward + Math.round(average);
+    this.satisfaction = Math.min(100, this.satisfaction + 5);
+    this.delivered += 1;
+    this.loads.context = Math.max(5, this.loads.context - 15);
+    this.setStatus(`完整交付「${box.recipe.result}」！下一位客戶已往櫃檯前進。`);
+    this.tone(1040, 0.14);
+    navigator.vibrate?.([25, 30, 35]);
+    this.cameras.main.flash(160, 70, 235, 214, false);
+    this.nextArrivalIn = Math.min(this.nextArrivalIn, 2);
+    this.updateHud();
+    if (this.left === 0) this.endRun();
   }
 
   private dash() {
@@ -1213,11 +1595,14 @@ export class WorkstationScene extends Phaser.Scene {
       this.satisfaction = Math.max(0, this.satisfaction - 6);
       this.complaints.push(`${project.customer.name} 排隊過久後離開`);
     });
-    if (patience.activeExhausted && !this.impatientBoxIds.has(patience.activeExhausted.id)) {
-      this.impatientBoxIds.add(patience.activeExhausted.id);
+    const acceptedExhausted = patience.exhausted.filter((project) => project.accepted && !this.impatientBoxIds.has(project.id));
+    acceptedExhausted.forEach((project) => {
+      this.impatientBoxIds.add(project.id);
       this.satisfaction = Math.max(0, this.satisfaction - 8);
-      this.complaints.push(`${patience.activeExhausted.customer.name} 等待過久`);
-      this.flashStatus('手上客戶的耐心耗盡！請立即完成並交付');
+      this.complaints.push(`${project.customer.name} 等待過久`);
+    });
+    if (acceptedExhausted.length) {
+      this.flashStatus('手上或機台裡的訂單已失去耐心；仍可完成，但滿意度已下降。');
     } else if (patience.abandoned.length) {
       this.flashStatus(`${patience.abandoned.length} 位客戶等太久離隊，滿意度下降`);
     }
@@ -1229,7 +1614,7 @@ export class WorkstationScene extends Phaser.Scene {
       this.setStatus('最後 30 秒！完成手上的訂單！');
       navigator.vibrate?.([40, 60, 40]);
     }
-    if (this.left === 0 && !(this.processing && this.folderInTransit)) this.endRun();
+    if (this.left === 0 && !this.processing) this.endRun();
   }
 
   private endRun() {
@@ -1237,7 +1622,11 @@ export class WorkstationScene extends Phaser.Scene {
     this.finished = true;
     this.decision?.destroy();
     this.decision = undefined;
+    this.orderDetail?.destroy();
+    this.orderDetail = undefined;
     this.decisionProjectId = undefined;
+    this.addOnBox = undefined;
+    this.addOnSource = undefined;
     this.resetJoystick();
     const [one, two, three] = this.runtime.stars;
     const stars = this.score >= three ? 3 : this.score >= two ? 2 : this.score >= one ? 1 : 0;
@@ -1265,7 +1654,7 @@ export class WorkstationScene extends Phaser.Scene {
     this.satisfactionText.setText(`滿意度\n${Math.round(this.satisfaction)}%`);
 
     const orders = this.outstandingOrders();
-    this.queueText.setText(`排隊 ${this.projectQueue.waiting.length}/${this.runtime.maxQueue}`);
+    this.queueText.setText(`排隊 ${this.projectQueue.waiting.length}　運算 ${this.stationJobs.size}/${this.maxParallelJobs}`);
     this.orderCards.forEach((card, cardIndex) => {
       const order = orders[cardIndex];
       if (!order) {
@@ -1274,10 +1663,33 @@ export class WorkstationScene extends Phaser.Scene {
       }
       card.container.setVisible(true);
       const isActive = this.projectQueue.active === order;
-      card.frame.setStrokeStyle(isActive ? 3 : 2, isActive ? 0x6ff5e5 : cardIndex === 0 ? 0xffd16e : 0x538aa4, isActive ? 0.95 : 0.58);
+      const helperOwns = this.helperAgent?.box?.id === order.id;
+      const stationJob = [...this.stationJobs.values()].find((job) => job.box.id === order.id);
+      const isWaiting = this.projectQueue.waiting.includes(order);
+      const frameColor = stationJob
+        ? STATION_COLORS[stationJob.view.data.id]
+        : helperOwns
+          ? 0xb69cff
+          : isActive
+            ? 0x6ff5e5
+            : isWaiting && cardIndex === 0
+              ? 0xffd16e
+              : 0x538aa4;
+      card.frame.setStrokeStyle(isActive || helperOwns || Boolean(stationJob) ? 3 : 2, frameColor, isActive || helperOwns || stationJob ? 0.95 : 0.58);
       card.title.setText(order.recipe.name.length > 9 ? `${order.recipe.name.slice(0, 9)}…` : order.recipe.name);
-      card.state.setText(isActive ? `手持 ${order.stage}/${order.recipe.runtimeSteps.length}` : cardIndex === 0 ? '櫃檯待接單' : '排隊等待');
-      card.state.setColor(isActive ? '#73f2df' : cardIndex === 0 ? '#ffe18b' : '#9abfd0');
+      const orderState = stationJob
+        ? stationJob.complete
+          ? `${STATION_SHORT_LABELS[stationJob.view.data.id]}完成・待取回`
+          : `${stationJob.owner === 'agent' ? 'Agent・' : ''}${STATION_SHORT_LABELS[stationJob.view.data.id]}運算中`
+        : helperOwns
+          ? `Agent 持有 ${order.stage}/${order.recipe.runtimeSteps.length}`
+          : isActive
+            ? `玩家持有 ${order.stage}/${order.recipe.runtimeSteps.length}`
+            : cardIndex === 0
+              ? '櫃檯待接單・點開詳情'
+              : '排隊等候・點開詳情';
+      card.state.setText(orderState);
+      card.state.setColor(stationJob ? '#ffffff' : helperOwns ? '#d9ccff' : isActive ? '#73f2df' : cardIndex === 0 ? '#ffe18b' : '#9abfd0');
       this.updateFolderIcons(card.iconSlots, order);
       const patienceRatio = Phaser.Math.Clamp(order.patience / Math.max(1, order.customer.patience), 0, 1);
       card.patienceFill.width = 132 * patienceRatio;
@@ -1316,16 +1728,25 @@ export class WorkstationScene extends Phaser.Scene {
   }
 
   private actionState() {
-    if (this.processing) return '處理中';
-    if (!this.nearby) return '靠近設備';
-    if (this.nearby.data.id === 'counter') {
-      if (!this.box) return '等待';
-      if (!this.box.accepted) return '回應';
-      if (this.box.complete) return '交付';
-      return '未完成';
+    if (this.processing) return '交付中';
+    if (!this.nearby) return '選擇機台';
+    const stationJob = this.stationJobs.get(this.nearby.data.id);
+    if (stationJob) {
+      if (stationJob.complete && stationJob.owner === 'player' && !this.projectQueue.active) return '取回資料夾';
+      return stationJob.complete ? '機台已完成' : '機台運算中';
     }
-    if (!this.box?.accepted) return '先接單';
-    return '處理';
+    if (this.nearby.data.id === 'counter') {
+      if (this.helperAgent?.selected && this.helperAgent.box) {
+        return this.helperAgent.box.complete ? '交付 Agent' : 'Agent 尚未完成';
+      }
+      if (!this.box) return '接待';
+      if (!this.box.accepted) return '接單';
+      if (this.box.complete) return '交付';
+      return '尚未完成';
+    }
+    if (this.helperAgent?.selected && this.helperAgent.box && !this.helperAgent.busy) return '指派 Agent';
+    if (!this.box?.accepted) return '沒有資料夾';
+    return '放入機台';
   }
 
   private setStatus(message: string) {

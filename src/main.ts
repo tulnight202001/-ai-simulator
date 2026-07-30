@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import './style.css';
-import { buyUpgrade, createCareer, recordLevel, type Career } from './core/career';
+import { buyUpgrade, createCareer, ensureAgentAvailability, recordLevel, type Career } from './core/career';
 import { drawModelChoices } from './core/modelDraw';
 import { isLevelUnlocked } from './core/v1Runtime';
 import { models, type ModelDefinition } from './data/content';
@@ -168,6 +168,7 @@ function pickModel() {
 function careerHub() {
   if (!activeCareer || !chosen) return void menu();
   runMode = 'career';
+  if (ensureAgentAvailability(activeCareer)) void saveCareer(activeCareer);
   const upgrades = v1Upgrades.filter((upgrade) => upgrade.era <= activeCareer!.era);
   const totalStars = Object.values(activeCareer.levels).reduce((total, level) => total + level.stars, 0);
   shell(`
@@ -202,15 +203,10 @@ function careerHub() {
         }).join('')}
       </div>
       ${activeCareer.agent.unlocked ? `
-        <label class="agent-setting">
-          <span><b>Agent 指派</b><small>休息時不占用資源</small></span>
-          <select id="agent-assignment">
-            <option value="">休息</option>
-            <option value="text">文字單步</option>
-            <option value="art">繪圖單步</option>
-            <option value="code">程式單步</option>
-          </select>
-        </label>` : ''}
+        <div class="agent-setting">
+          <span><b>跟隨 Agent Lv.${activeCareer.agent.level}</b><small>關卡中點 Agent 徽章交接資料夾，再帶它到任意機台下指令。</small></span>
+          <strong>${activeCareer.era >= 5 && activeCareer.agent.level >= 2 ? '1 名助手／最多 3 台並行' : '1 名助手／最多 2 台並行'}</strong>
+        </div>` : ''}
       <p id="shop-status" class="form-status" role="status"></p>
       <div class="button-row">
         <button class="secondary" id="backup">下載 JSON</button>
@@ -230,17 +226,6 @@ function careerHub() {
       }
     };
   });
-
-  const assignment = document.querySelector<HTMLSelectElement>('#agent-assignment');
-  if (assignment) {
-    assignment.value = activeCareer.agent.assignment ?? '';
-    assignment.onchange = async () => {
-      activeCareer!.agent.assignment = assignment.value || null;
-      activeCareer!.updatedAt = new Date().toISOString();
-      await saveCareer(activeCareer!);
-      document.querySelector('#shop-status')!.textContent = assignment.value ? 'Agent 指派已儲存。' : 'Agent 已進入休息。';
-    };
-  }
 
   document.querySelector('#backup')!.addEventListener('click', () => {
     const blob = new Blob([exportCareer(activeCareer!)], { type: 'application/json' });
@@ -326,6 +311,11 @@ function startGame() {
 
   window.scrollTo({ top: 0, left: 0 });
   const sceneCareer = runMode === 'trial' ? structuredClone(activeCareer) : activeCareer;
+  if (runMode === 'trial' && selectedLevel.era >= 4) {
+    sceneCareer.agent.unlocked = true;
+    sceneCareer.agent.level = Math.max(sceneCareer.agent.level, selectedLevel.era === 4 ? 1 : 2);
+    sceneCareer.agent.assignment = null;
+  }
   const sceneSeed = activeCareer.seed + selectedLevel.index + (runMode === 'trial' ? selectedLevel.era * 1_000 : 0);
   const scene = new WorkstationScene(chosen, sceneCareer, selectedLevel.id, sceneSeed, finish);
   game = new Phaser.Game({

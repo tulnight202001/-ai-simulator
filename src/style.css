@@ -404,6 +404,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
 .agent-setting { display: flex; justify-content: space-between; align-items: center; gap: 15px; margin: 14px 0; padding: 14px; text-align: left; border: 1px solid #ffffff13; border-radius: 15px; background: #ffffff08; }
 .agent-setting b, .agent-setting small { display: block; }
 .agent-setting small { margin-top: 4px; color: #748ca4; }
+.agent-setting strong { flex: 0 0 auto; max-width: 170px; color: #75efe4; font-size: 12px; line-height: 1.45; text-align: right; }
 .agent-setting select { padding: 10px; color: white; border: 1px solid #83bed63a; border-radius: 10px; background: #081528; }
 .button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .button-row button { width: 100%; }
@@ -580,6 +581,7 @@ h1, h2, h3, p { overflow-wrap: anywhere; }
   .career-stats { grid-template-columns: 1fr 1fr; }
   .upgrade-grid { grid-template-columns: 1fr; }
   .agent-setting { align-items: flex-start; flex-direction: column; }
+  .agent-setting strong { max-width: none; text-align: left; }
   .agent-setting select { width: 100%; }
   .button-row { grid-template-columns: 1fr; }
   .button-row button { margin: 3px 0; }

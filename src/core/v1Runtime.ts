@@ -40,13 +40,40 @@ export interface ProjectBox {
   quality: number;
   patience: number;
   accepted: boolean;
+  decision?: CustomerDecision;
+  specificationsRevealed: boolean;
+  qualityBonus: number;
+  decisionImpact?: CustomerDecisionImpact;
   addOn?: { label: string; accepted?: boolean };
   complete: boolean;
+}
+
+export interface CustomerDecisionImpact {
+  decision: CustomerDecision;
+  label: string;
+  summary: string;
+  details: string[];
+  patienceDelta: number;
+  satisfactionDelta: number;
+  qualityBonus: number;
+  rewardBefore: number;
+  rewardAfter: number;
+  stepCountBefore: number;
+  stepCountAfter: number;
+  specificationsRevealed: boolean;
+}
+
+export interface CustomerDecisionResult {
+  accepted: boolean;
+  satisfaction: number;
+  message: string;
+  impact: CustomerDecisionImpact;
 }
 
 export interface ProjectQueue {
   readonly maxQueue: number;
   waiting: ProjectBox[];
+  delegated: ProjectBox[];
   active?: ProjectBox;
   delivered: number;
   rejected: number;
@@ -58,13 +85,7 @@ export type QueueActionResult =
   | { ok: false; reason: string };
 
 export type QueueDecisionResult =
-  | {
-    ok: true;
-    project: ProjectBox;
-    accepted: boolean;
-    satisfaction: number;
-    message: string;
-  }
+  | ({ ok: true; project: ProjectBox } & CustomerDecisionResult)
   | { ok: false; reason: string };
 
 export interface QueuePatienceResult {
@@ -89,6 +110,31 @@ export interface AgentState {
 }
 
 const byId = <T extends { id: string }>(items: readonly T[], id: string) => items.find((item) => item.id === id);
+
+function cloneRuntimeRecipe(recipe: RuntimeRecipe): RuntimeRecipe {
+  return {
+    ...recipe,
+    steps: [...recipe.steps],
+    addOns: [...recipe.addOns],
+    runtimeSteps: recipe.runtimeSteps.map((step) => ({ ...step })),
+  };
+}
+
+function recipeWithRoute(
+  recipe: RuntimeRecipe,
+  route: readonly RuntimeStep[],
+  rewardMultiplier: number,
+  qualityTargetMultiplier: number,
+): RuntimeRecipe {
+  const runtimeSteps = route.map((step, index) => ({ ...step, index }));
+  return {
+    ...recipe,
+    steps: runtimeSteps.map((step) => step.stationId),
+    runtimeSteps,
+    reward: Math.max(1, Math.round(recipe.reward * rewardMultiplier)),
+    qualityTarget: Math.max(1, Math.round(recipe.qualityTarget * qualityTargetMultiplier)),
+  };
+}
 
 export function runtimeRecipe(recipe: RecipeData): RuntimeRecipe {
   return {
@@ -138,53 +184,107 @@ export function isLevelUnlocked(career: Career, level: LevelData) {
 export function createProject(id: string, recipe: RuntimeRecipe, customer: CustomerData): ProjectBox {
   return {
     id,
-    recipe,
+    recipe: cloneRuntimeRecipe(recipe),
     customer,
     stage: 0,
     outputs: [],
     quality: 0,
     patience: customer.patience,
     accepted: false,
+    specificationsRevealed: false,
+    qualityBonus: 0,
     complete: false,
   };
 }
 
-export function decideCustomer(box: ProjectBox, decision: CustomerDecision) {
+export function decideCustomer(box: ProjectBox, decision: CustomerDecision): CustomerDecisionResult {
+  const rewardBefore = box.recipe.reward;
+  const stepCountBefore = box.recipe.runtimeSteps.length;
+  const patienceBefore = box.patience;
   let satisfaction = 0;
+  let label = '';
+  let summary = '';
+  let details: string[] = [];
+
+  box.accepted = decision !== 'reject';
+  box.decision = decision;
+  box.specificationsRevealed = false;
+  box.qualityBonus = 0;
+
   if (decision === 'accept') {
-    box.accepted = true;
-    satisfaction = box.customer.completeness >= .5 ? 2 : -5;
+    label = '接受原單';
+    satisfaction = Math.round((box.customer.completeness - .5) * 4);
+    summary = '照原規格、原工序與原報酬執行。';
+    details = [`工序 ${stepCountBefore} 道`, `報酬 ${rewardBefore}`, `順序：${box.recipe.sequenceMode === 'ordered' ? '固定' : '自由'}`];
   } else if (decision === 'question') {
-    box.accepted = true;
-    box.patience = Math.max(0, box.patience - 6);
-    satisfaction = box.customer.questionTolerance >= .5 ? 10 : -8;
+    label = '追問完整規格';
+    const patienceCost = Math.min(6, box.patience);
+    box.patience -= patienceCost;
+    box.specificationsRevealed = true;
+    box.qualityBonus = 8;
+    satisfaction = Math.round(4 + box.customer.questionTolerance * 4);
+    summary = '花少量耐心換取完整規格，每道工序獲得品質加成。';
+    details = [
+      `耐心 -${patienceCost}`,
+      `每道工序品質 +${box.qualityBonus}`,
+      `完整工序：${box.recipe.runtimeSteps.map((step) => step.label).join(' → ')}`,
+    ];
   } else if (decision === 'limits') {
-    box.accepted = true;
-    satisfaction = box.customer.contradictionChance > .2 ? 8 : 1;
+    label = '限制委託範圍';
+    const targetCount = Math.max(1, stepCountBefore - 1);
+    box.recipe = recipeWithRoute(box.recipe, box.recipe.runtimeSteps.slice(-targetCount), .7, .88);
+    satisfaction = Math.round(1 + box.customer.contradictionChance * 4);
+    summary = stepCountBefore === 1
+      ? '已是最短工序；維持單步交付但降低範圍與報酬。'
+      : '省略一個可選前置工序，較快完成但報酬降低。';
+    details = [`工序 ${stepCountBefore} → ${box.recipe.runtimeSteps.length}`, `報酬 ${rewardBefore} → ${box.recipe.reward}`, '品質門檻降低 12%'];
   } else if (decision === 'alternative') {
-    box.accepted = true;
-    satisfaction = box.customer.alternativeTolerance >= .5 ? 8 : -6;
+    label = '提出替代方案';
+    const targetCount = Math.max(1, Math.floor(stepCountBefore / 2));
+    box.recipe = recipeWithRoute(box.recipe, box.recipe.runtimeSteps.slice(-targetCount), .82, .92);
+    satisfaction = Math.round(2 + box.customer.alternativeTolerance * 4);
+    summary = '改走較短且仍可交付的替代路線，報酬與滿意度居中。';
+    details = [`工序 ${stepCountBefore} → ${box.recipe.runtimeSteps.length}`, `報酬 ${rewardBefore} → ${box.recipe.reward}`, '品質門檻降低 8%'];
   } else {
-    satisfaction = box.customer.patience < 40 ? 2 : -10;
+    label = '拒絕委託';
+    satisfaction = -2;
+    summary = '釋放佇列與手持欄位，承受小幅滿意度代價。';
+    details = ['不接單', '滿意度 -2', '不占用資料夾欄位'];
   }
-  return {
-    accepted: box.accepted,
-    satisfaction,
-    message: decision === 'reject'
-      ? '已拒絕專案'
-      : decision === 'question'
-        ? '需求已補齊，返工風險降低'
-        : '客戶決策已記錄',
+
+  const impact: CustomerDecisionImpact = {
+    decision,
+    label,
+    summary,
+    details,
+    patienceDelta: box.patience - patienceBefore,
+    satisfactionDelta: satisfaction,
+    qualityBonus: box.qualityBonus,
+    rewardBefore,
+    rewardAfter: box.recipe.reward,
+    stepCountBefore,
+    stepCountAfter: box.recipe.runtimeSteps.length,
+    specificationsRevealed: box.specificationsRevealed,
   };
+  box.decisionImpact = impact;
+  return { accepted: box.accepted, satisfaction, message: summary, impact };
 }
 
 /** Checks the next required station without changing stage, outputs, quality, or completion. */
 export function validateProjectStep(box: ProjectBox, stationId: WorkstationId): { ok: boolean; reason: string } {
   if (!box.accepted) return { ok: false, reason: '尚未在櫃台接受此任務' };
   if (box.complete) return { ok: false, reason: '資料箱成果已齊全，請回櫃台交付' };
-  const expected = box.recipe.runtimeSteps[box.stage];
-  if (!expected) return { ok: false, reason: '資料箱階段資料不完整，無法繼續加工' };
-  if (expected.stationId !== stationId) {
+  const pending = pendingProjectSteps(box);
+  const expected = box.recipe.sequenceMode === 'ordered'
+    ? box.recipe.runtimeSteps[box.stage]
+    : pending.find((step) => step.stationId === stationId);
+  if (!expected) {
+    if (box.recipe.sequenceMode === 'flexible' && pending.length) {
+      return { ok: false, reason: '此工作區不在尚未完成的自由工序中' };
+    }
+    return { ok: false, reason: '資料箱階段資料不完整，無法繼續加工' };
+  }
+  if (box.recipe.sequenceMode === 'ordered' && expected.stationId !== stationId) {
     const expectedStation = byId(v1Workstations, expected.stationId);
     return {
       ok: false,
@@ -194,31 +294,45 @@ export function validateProjectStep(box: ProjectBox, stationId: WorkstationId): 
   return { ok: true, reason: `可在 ${byId(v1Workstations, stationId)?.name ?? stationId} 加工` };
 }
 
+export function isProjectStepComplete(box: ProjectBox, step: RuntimeStep): boolean {
+  return box.outputs.some((output) => output.index === step.index);
+}
+
+export function pendingProjectSteps(box: ProjectBox): RuntimeStep[] {
+  return box.recipe.runtimeSteps.filter((step) => !isProjectStepComplete(box, step));
+}
+
 export function processProject(box: ProjectBox, stationId: WorkstationId, quality: number): { ok: boolean; reason: string } {
   const validation = validateProjectStep(box, stationId);
   if (!validation.ok) return validation;
 
-  const expected = box.recipe.runtimeSteps[box.stage];
+  const expected = box.recipe.sequenceMode === 'ordered'
+    ? box.recipe.runtimeSteps[box.stage]
+    : pendingProjectSteps(box).find((step) => step.stationId === stationId);
   if (!expected) return { ok: false, reason: '資料箱階段資料不完整，無法繼續加工' };
   box.outputs.push(expected);
-  box.stage += 1;
-  box.quality += quality;
-  box.complete = box.stage >= box.recipe.runtimeSteps.length;
+  box.stage = box.outputs.length;
+  box.quality += quality + box.qualityBonus;
+  box.complete = pendingProjectSteps(box).length === 0;
   return {
     ok: true,
     reason: box.complete
       ? '所有階段完成'
-      : `已保存 ${expected.output}，下一階段：${box.recipe.runtimeSteps[box.stage]?.label ?? '回櫃台交付'}`,
+      : box.recipe.sequenceMode === 'ordered'
+        ? `已保存 ${expected.output}，下一階段：${box.recipe.runtimeSteps[box.stage]?.label ?? '回櫃台交付'}`
+        : `已保存 ${expected.output}，尚有 ${pendingProjectSteps(box).length} 道自由工序`,
   };
 }
 
 export function createProjectQueue(maxQueue = 1): ProjectQueue {
   const normalizedMax = Number.isFinite(maxQueue) ? Math.max(1, Math.floor(maxQueue)) : 1;
-  return { maxQueue: normalizedMax, waiting: [], delivered: 0, rejected: 0, abandoned: 0 };
+  return { maxQueue: normalizedMax, waiting: [], delegated: [], delivered: 0, rejected: 0, abandoned: 0 };
 }
 
 export function outstandingProjects(queue: ProjectQueue): ProjectBox[] {
-  return queue.active ? [queue.active, ...queue.waiting] : [...queue.waiting];
+  return queue.active
+    ? [queue.active, ...queue.delegated, ...queue.waiting]
+    : [...queue.delegated, ...queue.waiting];
 }
 
 export function peekNextProject(queue: ProjectQueue): ProjectBox | undefined {
@@ -248,6 +362,41 @@ export function decideNextProject(queue: ProjectQueue, decision: CustomerDecisio
   return { ok: true, project, ...result };
 }
 
+export function delegateActiveProject(queue: ProjectQueue, maxAgents: number): QueueActionResult {
+  const project = queue.active;
+  if (!project) return { ok: false, reason: '玩家手上沒有可委派的資料箱' };
+  const agentSlots = Number.isFinite(maxAgents) ? Math.max(0, Math.floor(maxAgents)) : 0;
+  if (queue.delegated.length >= agentSlots) {
+    return { ok: false, reason: agentSlots === 0 ? '目前沒有可用 Agent' : '可見 Agent 都已持有資料箱' };
+  }
+  queue.active = undefined;
+  queue.delegated.push(project);
+  return { ok: true, project, reason: '資料箱已交給 Agent' };
+}
+
+export function reclaimDelegatedProject(queue: ProjectQueue, id: string): QueueActionResult {
+  if (queue.active) return { ok: false, reason: '玩家手上已有資料箱，無法取回' };
+  const index = queue.delegated.findIndex((project) => project.id === id);
+  if (index < 0) return { ok: false, reason: '找不到 Agent 持有的資料箱' };
+  const [project] = queue.delegated.splice(index, 1);
+  if (!project) return { ok: false, reason: '資料箱取回失敗' };
+  queue.active = project;
+  return { ok: true, project, reason: '已從 Agent 取回資料箱' };
+}
+
+export function deliverDelegatedProject(queue: ProjectQueue, id: string): QueueActionResult {
+  const index = queue.delegated.findIndex((project) => project.id === id);
+  if (index < 0) return { ok: false, reason: '找不到 Agent 持有的資料箱' };
+  const project = queue.delegated[index];
+  if (!project.complete) return { ok: false, reason: 'Agent 的資料箱尚未完成，不能交付' };
+  if (project.addOn && project.addOn.accepted === undefined) {
+    return { ok: false, reason: '尚未回覆客戶的追加要求' };
+  }
+  queue.delegated.splice(index, 1);
+  queue.delivered += 1;
+  return { ok: true, project, reason: 'Agent 已完成交付' };
+}
+
 export function tickProjectQueue(queue: ProjectQueue, seconds: number, patienceDrain = 1): QueuePatienceResult {
   const elapsed = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
   const pressure = Number.isFinite(patienceDrain) ? Math.max(0, patienceDrain) : 0;
@@ -262,6 +411,7 @@ export function tickProjectQueue(queue: ProjectQueue, seconds: number, patienceD
   };
 
   if (queue.active) reducePatience(queue.active);
+  queue.delegated.forEach(reducePatience);
   queue.waiting.forEach(reducePatience);
   queue.waiting = queue.waiting.filter((project) => {
     if (project.patience > 0) return true;
@@ -305,6 +455,7 @@ export function answerAddOn(box: ProjectBox, accept: boolean) {
     box.complete = false;
     box.recipe = {
       ...box.recipe,
+      steps: [...box.recipe.steps, finalStep.stationId],
       runtimeSteps: [...box.recipe.runtimeSteps, { ...finalStep, index: box.recipe.runtimeSteps.length }],
     };
     return { accepted: true, satisfaction: 8 };
