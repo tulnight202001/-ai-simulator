@@ -30,6 +30,8 @@ export const STATION_ART_IDS = [
 export const ERA_ART_IDS = [1, 2, 3, 4, 5] as const satisfies readonly EraId[];
 
 const GENERATED_ART_ROOT = 'art/generated/v2';
+const GENERATED_CUSTOMER_ART_ROOT = 'art/generated/v3';
+const GENERATED_STATION_ART_ROOT = 'art/generated/v3';
 
 export const modelArtPaths: Readonly<Record<ModelArtId, string>> = {
   relay: `${GENERATED_ART_ROOT}/ai-relay-v2.png`,
@@ -41,26 +43,26 @@ export const modelArtPaths: Readonly<Record<ModelArtId, string>> = {
 };
 
 export const customerArtPaths: Readonly<Record<CustomerArtId, string>> = {
-  polite: `${GENERATED_ART_ROOT}/customer-polite-v2.png`,
-  urgent: `${GENERATED_ART_ROOT}/customer-urgent-v2.png`,
-  vague: `${GENERATED_ART_ROOT}/customer-vague-v2.png`,
-  'last-change': `${GENERATED_ART_ROOT}/customer-last-change-v2.png`,
-  perfectionist: `${GENERATED_ART_ROOT}/customer-perfectionist-v2.png`,
-  'all-tools': `${GENERATED_ART_ROOT}/customer-all-tools-v2.png`,
+  polite: `${GENERATED_CUSTOMER_ART_ROOT}/customer-polite-v3.png`,
+  urgent: `${GENERATED_CUSTOMER_ART_ROOT}/customer-urgent-v3.png`,
+  vague: `${GENERATED_CUSTOMER_ART_ROOT}/customer-vague-v3.png`,
+  'last-change': `${GENERATED_CUSTOMER_ART_ROOT}/customer-last-change-v3.png`,
+  perfectionist: `${GENERATED_CUSTOMER_ART_ROOT}/customer-perfectionist-v3.png`,
+  'all-tools': `${GENERATED_CUSTOMER_ART_ROOT}/customer-all-tools-v3.png`,
 };
 
 export const stationArtPaths: Readonly<Record<WorkstationId, string>> = {
-  counter: `${GENERATED_ART_ROOT}/station-counter-v2.png`,
-  text: `${GENERATED_ART_ROOT}/station-text-v2.png`,
-  search: `${GENERATED_ART_ROOT}/station-search-v2.png`,
-  document: `${GENERATED_ART_ROOT}/station-document-v2.png`,
-  art: `${GENERATED_ART_ROOT}/station-art-v2.png`,
-  music: `${GENERATED_ART_ROOT}/station-music-v2.png`,
-  recording: `${GENERATED_ART_ROOT}/station-recording-v2.png`,
-  studio: `${GENERATED_ART_ROOT}/station-studio-v2.png`,
-  video: `${GENERATED_ART_ROOT}/station-video-v2.png`,
-  code: `${GENERATED_ART_ROOT}/station-code-v2.png`,
-  deploy: `${GENERATED_ART_ROOT}/station-deploy-v2.png`,
+  counter: `${GENERATED_STATION_ART_ROOT}/station-counter-v3.png`,
+  text: `${GENERATED_STATION_ART_ROOT}/station-text-v3.png`,
+  search: `${GENERATED_STATION_ART_ROOT}/station-search-v3.png`,
+  document: `${GENERATED_STATION_ART_ROOT}/station-document-v3.png`,
+  art: `${GENERATED_STATION_ART_ROOT}/station-art-v3.png`,
+  music: `${GENERATED_STATION_ART_ROOT}/station-music-v3.png`,
+  recording: `${GENERATED_STATION_ART_ROOT}/station-recording-v3.png`,
+  studio: `${GENERATED_STATION_ART_ROOT}/station-studio-v3.png`,
+  video: `${GENERATED_STATION_ART_ROOT}/station-video-v3.png`,
+  code: `${GENERATED_STATION_ART_ROOT}/station-code-v3.png`,
+  deploy: `${GENERATED_STATION_ART_ROOT}/station-deploy-v3.png`,
 };
 
 export const eraBackgroundPaths: Readonly<Record<EraId, string>> = {

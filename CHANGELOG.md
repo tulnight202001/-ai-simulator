@@ -75,3 +75,16 @@
 - Connected all 11 workstations and the v1 recipe catalog to data-driven Phaser runtime maps.
 - Added staged project boxes, wrong-station blocking, customer decisions, post-delivery add-ons, runtime upgrade effects, and limited automatic Agents.
 - Added focused unit coverage for all new gameplay rule families.
+
+## 0.5.0-dev — 2026-07-30
+
+- 客戶正式改為六種 2-B 方向的高畫質 2.5D Q 版人類，固定站在櫃檯後；AI、資料夾與工作站保留在前場。
+- 全部 11 種工作站升級為 v3 素材；AI 與五紀元背景保留 v2，素材版本可獨立混用。
+- 新增頂部圖示訂單卡、個別耐心、最高五人排隊、到客節奏、資料夾交接與交付盤流程。
+- 訂單與資料夾改為工作站專屬色的幾何圖示；錯誤機台點擊完全靜默且無扣分，中間步驟不再直接顯示下一站答案。
+- 產品需求補齊目的、實際動作與完成成果；接單決策不再只顯示難以理解的產品短文。
+- 新增 Era 1–5 首關試玩入口；試玩不寫入正式生涯、獎勵、星級或解鎖。
+- 校準首頁／選角 AI 的手機顯示尺寸，並修正舊 service worker 快取造成頁面停留在淘汰介面的問題。
+- 完成 390×844 手機直向視覺檢查。
+- 修正決策中客戶可能換人、追加可能重複出現、最後瞬間交付可能不計分三個流程問題。
+- 本批 `npm test` 22/22、TypeScript check 與 production build 全部通過；僅有既有 Phaser chunk size warning。

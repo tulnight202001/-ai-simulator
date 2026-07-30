@@ -1,13 +1,14 @@
-# AI Simulator v2 美術資產清單
+# AI Simulator v2／v3 美術資產清單
 
-本文件固定正式遊戲使用的 v2 美術路徑與製作規格。程式端的唯一對照來源是 `src/data/artCatalog.ts`；不得在畫面或場景內另寫第二套檔名規則。
+本文件固定正式遊戲使用的美術路徑與製作規格。程式端的唯一對照來源是 `src/data/artCatalog.ts`；不得在畫面或場景內另寫第二套檔名規則。AI 角色與背景沿用 v2，客戶與工作站由 v3 覆蓋 v2。
 
 ## 產製與保留原則
 
 - 圖片使用 Codex 內建 ImageGen 逐項獨立生成，不把角色、客戶或工作站從同一張大圖裁切當成正式素材。
 - AI 角色、客戶與工作站先以純色色鍵背景產出，再使用本機色鍵工具去背，正式 PNG 必須保留透明背景與完整輪廓。
 - 場景背景為獨立 9:16 圖片，不含角色、客戶、工作站、HUD、文字或不可互動的假設備。
-- v2 正式素材存放於 `public/art/generated/v2/`，由 `artCatalog.ts` 以相對路徑提供，確保 localhost、靜態部署子路徑與 PWA 都能共用。
+- v2 AI 角色與背景存放於 `public/art/generated/v2/`；v3 客戶與工作站存放於 `public/art/generated/v3/`，均由 `artCatalog.ts` 以相對路徑提供，確保 localhost、靜態部署子路徑與 PWA 都能共用。
+- 客戶 v3 原始生成檔保存在 `review/art/history/2026-07-30_customer-v3-sources/`；工作站 v3 原始生成檔保存在 `review/art/history/2026-07-30_station-v3-sources/`。
 - ImageGen 原始輸出與去背前的色鍵圖保留於 `review/history/generated-art-sources/v2/`，不覆寫、不刪除既有 v1 圖片。
 - 舊版 `public/art/generated/*-v1.png` 保留為歷史對照，不再作為 v2 UI 與遊戲場景的正式來源。
 
@@ -28,22 +29,22 @@
 
 | ID | 角色方向 | 正式路徑 |
 | --- | --- | --- |
-| polite | 禮貌、資料多、整齊企劃感 | `public/art/generated/v2/customer-polite-v2.png` |
-| urgent | 急躁、時間壓力、前傾動勢 | `public/art/generated/v2/customer-urgent-v2.png` |
-| vague | 困惑、需求模糊、飄散提示 | `public/art/generated/v2/customer-vague-v2.png` |
-| last-change | 抱著多版修改、臨時追加感 | `public/art/generated/v2/customer-last-change-v2.png` |
-| perfectionist | 精密檢查、像素級審查、挑剔感 | `public/art/generated/v2/customer-perfectionist-v2.png` |
-| all-tools | 同時要求多工具、圖示環繞、期待過高 | `public/art/generated/v2/customer-all-tools-v2.png` |
+| polite | 禮貌、資料多、整齊企劃感 | `public/art/generated/v3/customer-polite-v3.png` |
+| urgent | 急躁、時間壓力、前傾動勢 | `public/art/generated/v3/customer-urgent-v3.png` |
+| vague | 困惑、需求模糊、飄散提示 | `public/art/generated/v3/customer-vague-v3.png` |
+| last-change | 抱著多版修改、臨時追加感 | `public/art/generated/v3/customer-last-change-v3.png` |
+| perfectionist | 精密檢查、像素級審查、挑剔感 | `public/art/generated/v3/customer-perfectionist-v3.png` |
+| all-tools | 同時要求多工具、圖示環繞、期待過高 | `public/art/generated/v3/customer-all-tools-v3.png` |
 
-客戶採可愛、簡化、虛擬化的人類造型；六類客戶不可共用同一張圖。
+客戶採 2-B 方向、約 2.75 頭身的可愛簡化 2.5D 人類造型，統一略俯視角度、圓潤材質與青藍場景光；六類不可只換色或共用同一張圖。正式檔保留透明完整輪廓，輕微呼吸／浮動由 `WorkstationScene` 的 tween 呈現，不拉伸人物。v2 客戶保留為歷史素材，不再由正式 catalog 載入。
 
 ## 工作站（11）
 
-正式檔名一律為 `public/art/generated/v2/station-{id}-v2.png`：
+正式檔名一律為 `public/art/generated/v3/station-{id}-v3.png`：
 
 `counter`、`text`、`search`、`document`、`art`、`music`、`recording`、`studio`、`video`、`code`、`deploy`。
 
-每座工作站是獨立透明 PNG，採一致的 2.5D 略俯視角度、外框比例與光源。圖內不含文字；功能差異以設備輪廓、操作元件與色彩辨識。背景不得預先烘焙工作站，以便深度排序、碰撞、點擊與 47 關配置重用。
+每座工作站是本次 Codex 內建 ImageGen 獨立生成並完成透明處理的 PNG，採一致的厚實深藍機身、2.5D 略俯視角度、外框比例與光源。圖內不含文字；功能差異以設備輪廓、正面核心大圖示、專屬操作元件與主色辨識，縮至手機約 96px 時仍須可辨。背景不得預先烘焙工作站，以便深度排序、碰撞、點擊與 47 關配置重用。v2 工作站保留為歷史素材，不再由正式 catalog 載入。
 
 ## 時代背景（5）
 

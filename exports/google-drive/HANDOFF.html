@@ -58,4 +58,19 @@
 </ul>
 <h2>2026-07-28 交接增量</h2>
 <p>正式資料的第一個完整可玩區段已接入：五紀元／47 關選擇和逐關解鎖、11 工作區模組化即時地圖、資料驅動多階段資料箱、櫃台客戶決策與追加、執行期升級與受限 Agent。請保留 <code>src/core/v1Runtime.ts</code> 作為規則核心，不要把流程搬回 Phaser 畫面硬編碼。</p>
-<p>尚未達完整 v1：實際第二資料箱的切換／暫存互動、更多客戶抱怨與返工分支、Agent 錯誤率／品質的完整數值平衡、完整聲音／教學／暫停／總評／無限模式仍需後續完成。GitHub Pages 與 Actions 已存在且 CI 能正常安裝、測試、型別檢查及建置；多存檔、JSON 匯入、升級和 Agent UI 已完成。</p><hr><p>此 HTML 由 <code>scripts/build_human_docs.py</code> 從 Repository Markdown 自動產生，請勿單獨修改。</p></main></body></html>
+<p>尚未達完整 v1：實際第二資料箱的切換／暫存互動、更多客戶抱怨與返工分支、Agent 錯誤率／品質的完整數值平衡、完整聲音／教學／暫停／總評／無限模式仍需後續完成。GitHub Pages 與 Actions 已存在且 CI 能正常安裝、測試、型別檢查及建置；多存檔、JSON 匯入、升級和 Agent UI 已完成。</p>
+<h2>2026-07-30 交接增量</h2>
+<ul>
+<li><code>src/data/artCatalog.ts</code> 是正式美術的唯一入口；客戶與全部 11 種工作站已切到 <code>public/art/generated/v3/</code>，AI 與背景仍使用 v2。</li>
+<li>排隊、個別耐心、接單、交付與追加規則在 <code>src/core/v1Runtime.ts</code>；關卡客流與產品目的／動作／成果在 <code>src/data/v1Catalog.ts</code>；訂單卡、客戶隊列、資料夾、工作站與交付盤呈現在 <code>src/game/WorkstationScene.ts</code>。</li>
+<li><code>src/main.ts</code> 的試玩模式可直接進入 Era 1–5 第一關。它只複製目前生涯供場景計算，結算不得呼叫正式進度或存檔寫入。</li>
+<li>六位客戶採程式 tween 的輕微待機動態，目前不是逐幀角色動畫。後續優先做手機真機觸控／效能與高峰客流平衡，不要再把客戶移到櫃檯前，也不要把 AI 換成人類角色。</li>
+<li>GitHub Pages 由 <code>.github/workflows/docs-pages.yml</code> 發布；推送 <code>full-v1-development</code> 後會先執行 install、test、check、build。v3 PNG 必須保持在 Git 追蹤範圍，否則乾淨建置會出現客戶圖 404。</li>
+</ul>
+<h3>本批接手注意事項</h3>
+<ul>
+<li>首頁／選角 AI 尺寸已按手機直向校準；開發模式會解除舊 service worker 控制並重載，正式 service worker 已升到 <code>ai-simulator-v5-20260730</code> 且採 network-first，勿恢復成舊版 cache-first。</li>
+<li><code>StepIconView</code> 是訂單卡與資料夾共用的彩色幾何圖示來源。錯機台必須保持完全靜默且無扣分；未完成訂單不得顯示下一站文字答案。</li>
+<li>五紀元首關試玩只使用生涯複本，結算不得寫入正式進度。390×844 視覺檢查已通過，下一輪以公開版 iPhone 真機回饋為準。</li>
+<li>本批最終基準為 <code>npm test</code> 22/22、check 通過、build 通過；唯一訊息是既有 Phaser chunk size warning。</li>
+</ul><hr><p>此 HTML 由 <code>scripts/build_human_docs.py</code> 從 Repository Markdown 自動產生，請勿單獨修改。</p></main></body></html>

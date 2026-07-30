@@ -14,6 +14,11 @@ let game: Phaser.Game | undefined;
 let chosen: ModelDefinition | undefined;
 let activeCareer: Career | undefined;
 let selectedLevel: LevelData | undefined;
+type RunMode = 'career' | 'trial';
+let runMode: RunMode = 'career';
+
+const eraNames = ['', '初生模型期', '多工具模型期', '複合專案期', 'Agent 協作期', '高負載平台期'];
+const trialPressure = ['', '熟悉流程', '多工加速', '複合製作', '協作調度', '高峰壓力'];
 
 const escapeHtml = (value: string) =>
   value.replace(/[&<>'"]/g, (character) => ({
@@ -162,6 +167,7 @@ function pickModel() {
 
 function careerHub() {
   if (!activeCareer || !chosen) return void menu();
+  runMode = 'career';
   const upgrades = v1Upgrades.filter((upgrade) => upgrade.era <= activeCareer!.era);
   const totalStars = Object.values(activeCareer.levels).reduce((total, level) => total + level.stars, 0);
   shell(`
@@ -176,7 +182,11 @@ function careerHub() {
         <span><small>評價</small><b>${activeCareer.rating.toFixed(1)}</b></span>
         <span><small>算力點</small><b>◈ ${activeCareer.resources}</b></span>
       </div>
-      <button class="primary pulse" id="levels">進入工作站 <span>→</span></button>
+      <button class="primary pulse" id="levels">進入正式生涯 <span>→</span></button>
+      <button class="trial-entry" id="trial-levels">
+        <span><b>五紀元首關試玩</b><small>直接比較後期節奏，不解鎖、不寫入存檔</small></span>
+        <strong>試玩 →</strong>
+      </button>
       <div class="panel-title"><span>核心與工作區升級</span><b>ERA ${activeCareer.era}</b></div>
       <div class="upgrade-grid">
         ${upgrades.map((upgrade) => {
@@ -210,6 +220,7 @@ function careerHub() {
   `, 'hub-shell');
 
   document.querySelector('#levels')!.addEventListener('click', levelSelect);
+  document.querySelector('#trial-levels')!.addEventListener('click', levelSelect);
   document.querySelector('#home')!.addEventListener('click', menu);
   document.querySelectorAll<HTMLElement>('.upgrade').forEach((element) => {
     element.onclick = async () => {
@@ -243,13 +254,31 @@ function careerHub() {
 
 function levelSelect() {
   if (!activeCareer) return void menu();
-  const eraNames = ['', '初生模型期', '多工具模型期', '複合專案期', 'Agent 協作期', '高負載平台期'];
+  const firstEraLevels = [1, 2, 3, 4, 5]
+    .map((era) => v1Levels.find((level) => level.era === era && level.index === 1))
+    .filter((level): level is LevelData => Boolean(level));
   shell(`
     <section class="level-select">
       <header class="section-header sticky">
         <button class="icon-back" id="hub">←</button>
         <div><p class="eyebrow">47 LEVEL CAREER</p><h2>選擇工作班次</h2></div>
       </header>
+      <section class="trial-panel" aria-labelledby="trial-title">
+        <div class="trial-heading">
+          <div><p class="eyebrow">ERA PRESSURE TEST / NO SAVE</p><h3 id="trial-title">五紀元首關試玩</h3></div>
+          <span>不影響正式進度</span>
+        </div>
+        <p>直接啟動每個紀元的第一關，快速比較客流、工序與時間壓力。試玩分數只顯示於結算畫面。</p>
+        <div class="trial-grid">
+          ${firstEraLevels.map((level) => `
+            <button class="trial-level" data-id="${level.id}">
+              <span>ERA ${level.era}</span>
+              <b>${eraNames[level.era]}</b>
+              <small>${trialPressure[level.era]} · ${Math.floor(level.duration / 60)}:${String(level.duration % 60).padStart(2, '0')}</small>
+            </button>`).join('')}
+        </div>
+      </section>
+      <div class="career-divider"><span>正式生涯關卡</span><small>依星級逐步解鎖並自動存檔</small></div>
       ${[1, 2, 3, 4, 5].map((era) => `
         <section class="era ${era > activeCareer!.era ? 'locked' : ''}">
           <header><span>ERA ${era}</span><h3>${eraNames[era]}</h3></header>
@@ -271,7 +300,15 @@ function levelSelect() {
 
   document.querySelectorAll<HTMLElement>('.level:not(:disabled)').forEach((element) => {
     element.onclick = () => {
+      runMode = 'career';
       selectedLevel = v1Levels.find((level) => level.id === element.dataset.id);
+      startGame();
+    };
+  });
+  document.querySelectorAll<HTMLElement>('.trial-level').forEach((element) => {
+    element.onclick = () => {
+      runMode = 'trial';
+      selectedLevel = firstEraLevels.find((level) => level.id === element.dataset.id);
       startGame();
     };
   });
@@ -288,7 +325,9 @@ function startGame() {
     </main>`;
 
   window.scrollTo({ top: 0, left: 0 });
-  const scene = new WorkstationScene(chosen, activeCareer, selectedLevel.id, activeCareer.seed + selectedLevel.index, finish);
+  const sceneCareer = runMode === 'trial' ? structuredClone(activeCareer) : activeCareer;
+  const sceneSeed = activeCareer.seed + selectedLevel.index + (runMode === 'trial' ? selectedLevel.era * 1_000 : 0);
+  const scene = new WorkstationScene(chosen, sceneCareer, selectedLevel.id, sceneSeed, finish);
   game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: 'game',
@@ -325,14 +364,18 @@ async function finish(result: RunResult) {
   game?.destroy(true);
   game = undefined;
   if (!activeCareer || !chosen || !selectedLevel) return void menu();
-  recordLevel(activeCareer, selectedLevel.id, result.score, result.stars, result.satisfaction, result.complaints[0]);
-  await saveCareer(activeCareer);
+  const isTrial = runMode === 'trial';
+  if (!isTrial) {
+    recordLevel(activeCareer, selectedLevel.id, result.score, result.stars, result.satisfaction, result.complaints[0]);
+    await saveCareer(activeCareer);
+  }
   const failureReason = result.complaints[0] ?? (result.delivered === 0 ? '沒有完成任何完整訂單；先確認資料箱下一步圖示。' : '分數尚未達一星門檻；縮短空跑動線並優先完成手上訂單。');
   shell(`
-    <section class="result ${result.stars ? 'success' : 'needs-retry'}">
+    <section class="result ${result.stars ? 'success' : 'needs-retry'} ${isTrial ? 'trial-result' : ''}">
       <div class="result-core">${result.stars ? '✓' : '↻'}</div>
-      <p class="eyebrow">${result.stars ? 'SHIFT COMPLETE' : 'SHIFT REVIEW'}</p>
+      <p class="eyebrow">${isTrial ? `ERA ${selectedLevel.era} TRIAL / NO SAVE` : result.stars ? 'SHIFT COMPLETE' : 'SHIFT REVIEW'}</p>
       <h2>${selectedLevel.name}</h2>
+      ${isTrial ? '<div class="trial-result-note"><b>試玩結算</b><span>本次結果不會解鎖關卡，也不會寫入生涯存檔。</span></div>' : ''}
       <div class="stars">${[1, 2, 3].map((number) => `<span class="${number <= result.stars ? 'on' : ''}">★</span>`).join('')}</div>
       <p class="big">${result.score}</p>
       <div class="result-grid">
@@ -342,22 +385,27 @@ async function finish(result: RunResult) {
       </div>
       <div class="quote">${result.stars ? '「伺服器終於可以休息。你也是。」' : escapeHtml(failureReason)}</div>
       <button class="primary" id="again">立即再試一次</button>
-      <button class="secondary" id="choose">選擇其他班次</button>
+      <button class="secondary" id="choose">${isTrial ? '試玩其他紀元' : '選擇其他班次'}</button>
       <button class="text-button" id="hub">返回生涯中心</button>
     </section>
   `, 'result-shell');
   document.querySelector('#again')!.addEventListener('click', startGame);
   document.querySelector('#choose')!.addEventListener('click', levelSelect);
-  document.querySelector('#hub')!.addEventListener('click', careerHub);
+  document.querySelector('#hub')!.addEventListener('click', () => {
+    runMode = 'career';
+    careerHub();
+  });
 }
 
 void menu();
 if ('serviceWorker' in navigator) {
   if (import.meta.env.DEV) {
     // 開發伺服器不得被先前的 PWA 快取蓋住，否則手機會看到已淘汰的介面。
-    void navigator.serviceWorker.getRegistrations().then((registrations) =>
-      Promise.all(registrations.map((registration) => registration.unregister())),
-    );
+    void navigator.serviceWorker.getRegistrations().then(async (registrations) => {
+      const wasControlled = Boolean(navigator.serviceWorker.controller);
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+      if (wasControlled) window.location.reload();
+    });
   } else {
     window.addEventListener('load', () => {
       void navigator.serviceWorker.register(new URL('./sw.js', window.location.href));

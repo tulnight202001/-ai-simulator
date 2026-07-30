@@ -10,7 +10,10 @@ __pycache__/
 !public/art/generated/*.png
 !public/art/generated/v2/
 !public/art/generated/v2/*.png
+!public/art/generated/v3/
+!public/art/generated/v3/*.png
 .dev-server.*.log
+.codex-vite.*.log
 *.ico
 *.mp3
 *.wav

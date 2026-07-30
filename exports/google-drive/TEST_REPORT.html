@@ -57,4 +57,19 @@
 <li><code>npm run check</code>：通過，未略過專案原始碼檢查。</li>
 <li><code>npm run build</code>：通過；Vite 僅回報既有的單一 Phaser bundle 大於 500 kB 警告。</li>
 <li>GitHub Actions：本地 commit 後建立 PR，遠端狀態待 workflow 回報。</li>
-</ul><hr><p>此 HTML 由 <code>scripts/build_human_docs.py</code> 從 Repository Markdown 自動產生，請勿單獨修改。</p></main></body></html>
+</ul>
+<h2>2026-07-30 客戶 v3、排隊訂單與試玩模式</h2>
+<p>| 檢查 | 結果 | 證據／說明 |</p>
+<p>|---|---|---|</p>
+<p>| <code>npm test</code> | ✅ 通過 | 3 個測試檔、22/22 測試通過；包含佇列、個別耐心、決策、交付、追加只出現一次與品質只計算一次。 |</p>
+<p>| <code>npm run check</code> | ✅ 通過 | <code>tsc -b --pretty false</code> 通過，未降低 strict 檢查。 |</p>
+<p>| <code>npm run build</code> | ✅ 通過 | production build 完成；僅有既存 Phaser 單一 bundle 大於 500 kB 的效能警告。 |</p>
+<p>| 390×844 手機直向冒煙 | ✅ 通過 | 本機 Era 5 首關顯示頂部三張訂單卡、排隊數、個別耐心、五個客戶槽與前後場分層；客戶在櫃檯後、AI 在前場。 |</p>
+<p>| 接單與一步加工 | ✅ 通過 | 點擊需求櫃檯可看到目的／動作／成果與五種決策；接受後資料夾交到 AI 手上，前往正確文字工作站後進度由 0/4 變為 1/4。 |</p>
+<p>| v3 客戶圖片 | ✅ 通過 | <code>artCatalog</code> 六條 v3 路徑存在，透明邊角與尺寸後製檢查通過；本機關卡載入無客戶破圖。 |</p>
+<p>| v3 工作站與幾何委託 | ✅ 通過 | 11 種工作站均由 v3 路徑載入；訂單卡與客戶／AI 資料夾顯示工作站專屬色及幾何圖示，單步圖示置中。 |</p>
+<p>| 錯站與答案隱藏 | ✅ 程式檢查 | 錯機台分支沒有提示、震動、音效、扣分或負載變化；中間步驟完成後只提示對照圖案，不顯示下一站文字答案。 |</p>
+<p>| 首頁／選角與快取 | ✅ 通過 | 390×844 下 AI 顯示尺寸與裁切正常；開發模式清除舊 SW 控制，正式版使用 <code>ai-simulator-v5-20260730</code> network-first 更新並保留離線回退。 |</p>
+<p>| 試玩隔離 | ✅ 程式與測試通過 | Era 1–5 首關均可直接啟動；試玩結算不呼叫正式星級、獎勵、解鎖或 IndexedDB 保存。 |</p>
+<p>| iPhone 真機 | ⚠️ 待使用者驗收 | 已完成等比例手機視窗檢查，仍需公開版本更新後由 iPhone 實際觸控與效能驗收。 |</p>
+<p>註：首次在受限沙箱執行 Vitest 時，esbuild 子程序因 <code>spawn EPERM</code> 無法啟動；改在允許本機子程序的相同工作區執行後一次通過。這是執行環境限制，不是測試失敗。</p><hr><p>此 HTML 由 <code>scripts/build_human_docs.py</code> 從 Repository Markdown 自動產生，請勿單獨修改。</p></main></body></html>

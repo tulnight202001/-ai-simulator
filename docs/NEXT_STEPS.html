@@ -1,13 +1,19 @@
 <!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>下一階段工作｜AI Simulator</title><style>
 :root{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans TC',sans-serif;color:#17213c;background:#f3f6fb;line-height:1.7}*{box-sizing:border-box}body{margin:0}header{background:linear-gradient(135deg,#101b38,#245b88);color:white;padding:28px max(20px,calc((100% - 920px)/2))}header a{color:#bdefff}main{max-width:920px;margin:auto;background:white;padding:28px clamp(18px,5vw,54px);min-height:100vh}h1,h2,h3{line-height:1.25;color:#12234b}h1{font-size:clamp(2rem,7vw,3rem)}h2{margin-top:2em;border-bottom:2px solid #dce6f5;padding-bottom:.3em}a{color:#1769aa}code{background:#edf2f8;padding:.15em .35em;border-radius:5px;overflow-wrap:anywhere}pre{background:#10182d;color:#edf6ff;padding:16px;border-radius:12px;overflow:auto}pre code{background:none;padding:0}blockquote{border-left:4px solid #54b8d1;margin-left:0;padding-left:18px;color:#485673}table{border-collapse:collapse;width:100%;display:block;overflow:auto}th,td{border:1px solid #ccd7e7;padding:8px;text-align:left}.meta,.notice{border-radius:12px;padding:13px 16px}.meta{background:#eaf3ff}.notice{background:#fff3cf;border-left:5px solid #e4ae2d}nav{display:flex;gap:8px;flex-wrap:wrap}nav a{background:#ffffff18;border:1px solid #ffffff38;border-radius:999px;padding:5px 11px;text-decoration:none}@media(max-width:600px){header{padding:22px 18px}main{padding:22px 18px}}
 </style></head><body><header><b>關於我重生為 AI 模型的⋯</b><p>人類可閱讀專案文件</p><nav><a href="../docs/GAME_SPEC.html">完整遊戲規格</a><a href="../docs/IMPLEMENTATION_PLAN.html">完整實作計畫</a><a href="../docs/CURRENT_STATE.html">目前狀態</a><a href="../docs/TEST_REPORT.html">測試報告</a><a href="../docs/HANDOFF.html">接手說明</a><a href="../docs/CHANGELOG.html">重要變更紀錄</a><a href="../docs/NEXT_STEPS.html">下一階段工作</a></nav></header><main><div class="meta">版本 0.2.0-alpha｜更新 2026-07-27｜程式基準 Commit bb9d072<br>內容來源：<code>NEXT_STEPS.md</code></div><h1>NEXT STEPS</h1>
-<p>更新：2026-07-28。完整第一版尚未達 <code>GAME_SPEC.md</code> 驗收標準。</p>
+<p>更新：2026-07-30。v3 客戶／11 工作站、彩色幾何訂單與資料夾、錯站靜默、下一站答案隱藏、快取修正與五紀元首關試玩已接入；390×844 視覺檢查及 22/22 test、check、build 已通過，完整第一版仍未達 <code>GAME_SPEC.md</code> 驗收標準。</p>
+<h2>已完成基準（不要重做）</h2>
+<ul>
+<li>首頁／選角 AI 手機尺寸與 service worker 更新策略已修正；AI／背景 v2 可與客戶／工作站 v3 混用。</li>
+<li>訂單與資料夾以工作站色彩及幾何圖示讓玩家自行判讀；錯站不給答案或懲罰，中間步驟也不顯示下一站文字。</li>
+<li>Era 1–5 首關試玩不寫入生涯；後續修改不得破壞此隔離。</li>
+</ul>
 <h2>下一個任務可直接續作</h2>
 <ul>
-<li>在 <code>src/core/v1Runtime.ts</code> 與 <code>WorkstationScene</code> 完成<strong>真正可切換的多資料箱攜帶／暫存架</strong>：依 <code>caseSlots</code> 顯示槽位、允許選箱、每箱各自保存階段與客戶綁定，加入測試。</li>
-<li>將客戶流程深化為資料驅動狀態機：矛盾需求、逾時抱怨、品質不足返工、追加後再次交付；把投訴原因與滿意度明細寫入 <code>Career</code>，不可只顯示訊息。</li>
-<li>為 Agent 加入 catalog 數值（速度、品質、錯誤率、RAM/server 負載），限定單步簡單任務並讓錯誤產生可返工成果；完成指定工作區、冷卻、休息與負載 UI。</li>
-<li>以平衡模擬驗證 47 關星級門檻、獎勵與每紀元解鎖，確保三分鐘內各種配方實際可完成，禁止以延長等待替代複雜度。</li>
-<li>完成教學、暫停、設定／聲音、能力詳情、生涯總評與無限模式；所有工作完成後再依 <code>GAME_SPEC.md</code> 做第一版驗收，未達標不得宣稱完成。</li>
+<li>先以公開測試版完成 iPhone 真機的觸控熱區、字級、排隊辨識與 Era 5 效能回饋；只修正實際問題，不做重複驗證。</li>
+<li>在 <code>src/core/v1Runtime.ts</code> 與 <code>WorkstationScene</code> 完成<strong>真正可切換的多資料夾攜帶／暫存架</strong>：依 <code>caseSlots</code> 顯示槽位、允許選單、每份各自保存階段與客戶綁定。</li>
+<li>將客戶流程深化為資料驅動狀態機：矛盾需求、品質不足返工、投訴原因與滿意度明細；保留目前個別耐心、排隊離場與單次追加邊界。</li>
+<li>為 Agent 加入 catalog 數值（速度、品質、錯誤率、RAM/server 負載），限定單步簡單任務並讓錯誤產生可返工成果。</li>
+<li>以平衡模擬驗證 47 關星級門檻、獎勵與每紀元解鎖，再完成教學、暫停、設定／聲音、總評與無限模式；未達標不得宣稱完整 v1。</li>
 </ul>
-<p>每次工作必須執行 <code>npm test</code>、<code>npm run check</code>、<code>npm run build</code>、<code>python3 scripts/build_human_docs.py</code>，同步 <code>/docs</code> 與 <code>/exports/google-drive</code>，並更新交接文件。</p><hr><p>此 HTML 由 <code>scripts/build_human_docs.py</code> 從 Repository Markdown 自動產生，請勿單獨修改。</p></main></body></html>
+<p>每個有意義的程式批次各執行一次 <code>npm test</code>、<code>npm run check</code>、<code>npm run build</code>；不要重複讀寫存檔或反覆跑相同驗證。需要發布文件時再同步 <code>/docs</code>、<code>/exports/google-drive</code> 與交接文件。</p><hr><p>此 HTML 由 <code>scripts/build_human_docs.py</code> 從 Repository Markdown 自動產生，請勿單獨修改。</p></main></body></html>
