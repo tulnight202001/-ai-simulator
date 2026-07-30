@@ -43,6 +43,7 @@ interface StationView {
   container: Phaser.GameObjects.Container;
   frame: Phaser.GameObjects.Rectangle;
   progress: Phaser.GameObjects.Rectangle;
+  progressMax: number;
   access: Phaser.Math.Vector2;
   obstacle: Phaser.Geom.Rectangle;
 }
@@ -412,8 +413,8 @@ export class WorkstationScene extends Phaser.Scene {
     const itemIndex = nonCounter.findIndex((item) => item.id === station.id);
     const variant = Number(this.runtime.mapId.split('-').at(-1)) || 1;
     const compact = nonCounter.length > 6;
-    const rowGap = compact ? 62 : 118;
-    const firstY = compact ? 470 : 500;
+    const rowGap = compact ? 77 : 118;
+    const firstY = compact ? 450 : 500;
     const baseRow = Math.floor(itemIndex / 2);
     const rowOrders = [0, 2, 4, 1, 3];
     const row = variant === 3 && compact ? rowOrders[baseRow] ?? baseRow : baseRow;
@@ -421,7 +422,7 @@ export class WorkstationScene extends Phaser.Scene {
     const isLeft = (itemIndex % 2 === 0) !== mirrored;
     const edgeOffset = variant === 3 && row % 2 === 1 ? 8 : 0;
     return {
-      x: isLeft ? 88 + edgeOffset : 452 - edgeOffset,
+      x: isLeft ? 82 + edgeOffset : 458 - edgeOffset,
       y: firstY + row * rowGap,
     };
   }
@@ -662,41 +663,39 @@ export class WorkstationScene extends Phaser.Scene {
       const { x, y } = this.stationPosition(station, index);
       const color = STATION_COLORS[station.id] ?? 0x65d9e8;
       const isCounter = station.id === 'counter';
-      const hitWidth = isCounter ? 492 : 144;
-      const hitHeight = isCounter ? 116 : 72;
+      const hitWidth = isCounter ? 224 : compact ? 132 : 150;
+      const hitHeight = isCounter ? 148 : compact ? 82 : 106;
       const frame = this.add
         .rectangle(0, 0, hitWidth, hitHeight, 0x07101e, 0.025)
         .setStrokeStyle(1, color, 0.16);
-      const sprite = this.add.image(0, isCounter ? 0 : compact ? -5 : -12, `station-${station.id}-v3`);
-      this.fitImage(sprite, isCounter ? 492 : compact ? 136 : 142, isCounter ? 126 : compact ? 58 : 92);
-      const iconPanelY = isCounter ? -46 : compact ? -7 : -17;
-      const iconPanelWidth = isCounter ? 112 : compact ? 68 : 78;
-      const iconPanelHeight = isCounter ? 44 : compact ? 42 : 52;
-      const iconPanel = this.add
-        .rectangle(0, iconPanelY, iconPanelWidth, iconPanelHeight, 0x020611, 0.9)
-        .setStrokeStyle(3, color, 1);
-      const iconGlyph = this.add.graphics().setPosition(0, iconPanelY);
-      this.drawStationGlyph(iconGlyph, station.id, isCounter ? 54 : compact ? 56 : 64, color);
-      const labelY = isCounter ? 36 : compact ? 18 : 19;
-      const labelWidth = isCounter ? 164 : compact ? 128 : 132;
-      const labelHeight = isCounter ? 28 : compact ? 20 : 24;
+      const glow = this.add
+        .ellipse(0, isCounter ? 20 : compact ? 13 : 17, isCounter ? 176 : compact ? 92 : 116, isCounter ? 78 : compact ? 48 : 66, color, 0.1)
+        .setBlendMode(Phaser.BlendModes.ADD);
+      const sprite = this.add.image(0, isCounter ? -4 : compact ? -3 : -10, `station-${station.id}-v3`);
+      this.fitImage(sprite, isCounter ? 220 : compact ? 122 : 148, isCounter ? 156 : compact ? 86 : 104);
+      const labelY = isCounter ? 55 : compact ? 33 : 40;
+      const labelWidth = isCounter ? 142 : compact ? 94 : 116;
+      const labelHeight = isCounter ? 24 : compact ? 17 : 21;
       const labelPlate = this.add
-        .rectangle(0, labelY, labelWidth, labelHeight, 0x03101c, 0.96)
-        .setStrokeStyle(1, color, 0.72);
+        .rectangle(0, labelY, labelWidth, labelHeight, 0x03101c, compact && !isCounter ? 0.76 : 0.9)
+        .setStrokeStyle(1, color, 0.72)
+        .setVisible(!compact || isCounter);
       const label = this.add
         .text(0, labelY, STATION_SHORT_LABELS[station.id], {
-          fontSize: isCounter ? '16px' : '15px',
+          fontSize: isCounter ? '15px' : compact ? '12px' : '14px',
           fontStyle: 'bold',
           color: '#effbff',
           align: 'center',
         })
         .setOrigin(0.5)
-        .setResolution(2);
-      const progressY = isCounter ? 53 : 34;
-      const progressBack = this.add.rectangle(-48, progressY, 96, 5, 0x07101e, 0.92).setOrigin(0, 0.5);
-      const progress = this.add.rectangle(-48, progressY, 0, 5, color, 1).setOrigin(0, 0.5);
+        .setResolution(2)
+        .setVisible(!compact || isCounter);
+      const progressWidth = isCounter ? 112 : compact ? 82 : 98;
+      const progressY = isCounter ? 70 : compact ? 43 : 52;
+      const progressBack = this.add.rectangle(-progressWidth / 2, progressY, progressWidth, 4, 0x07101e, 0.92).setOrigin(0, 0.5);
+      const progress = this.add.rectangle(-progressWidth / 2, progressY, 0, 4, color, 1).setOrigin(0, 0.5);
       const container = this.add
-        .container(x, y, [frame, sprite, iconPanel, iconGlyph, labelPlate, label, progressBack, progress])
+        .container(x, y, [frame, glow, sprite, labelPlate, label, progressBack, progress])
         .setSize(hitWidth, hitHeight)
         .setDepth(isCounter ? 410 : y)
         .setInteractive({ useHandCursor: true });
@@ -704,7 +703,7 @@ export class WorkstationScene extends Phaser.Scene {
         ? new Phaser.Math.Vector2(x, y + 82)
         : new Phaser.Math.Vector2(x < GAME_WIDTH / 2 ? x + 104 : x - 104, y + 18);
       const obstacle = new Phaser.Geom.Rectangle(x - hitWidth / 2, y - hitHeight / 2, hitWidth, hitHeight);
-      const view: StationView = { data: station, container, frame, progress, access, obstacle };
+      const view: StationView = { data: station, container, frame, progress, progressMax: progressWidth, access, obstacle };
       container.setData('stationView', view);
       container.on('pointerdown', () => {
         this.goToStation(view);
@@ -1322,7 +1321,7 @@ export class WorkstationScene extends Phaser.Scene {
       if (job.complete) return;
       const total = Math.max(1, job.endsAt - job.startedAt);
       const ratio = Phaser.Math.Clamp((this.time.now - job.startedAt) / total, 0, 1);
-      job.view.progress.width = 96 * ratio;
+      job.view.progress.width = job.view.progressMax * ratio;
       if (ratio >= 1) this.finishStationJob(job);
     });
   }
@@ -1338,7 +1337,7 @@ export class WorkstationScene extends Phaser.Scene {
     );
     if (!result.ok) return;
     job.complete = true;
-    job.view.progress.width = 96;
+    job.view.progress.width = job.view.progressMax;
     this.loads[job.view.data.resource] = Math.max(5, this.loads[job.view.data.resource] - job.view.data.cost * 0.7);
     this.loads.server = Math.max(12, this.loads.server - (job.owner === 'agent' ? 17 : 14));
     this.score += 40;
