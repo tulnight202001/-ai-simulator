@@ -101,6 +101,9 @@ interface HelperAgentView {
 
 const GAME_WIDTH = 540;
 const GAME_HEIGHT = 960;
+const PLAYER_STATION_MARGIN_X = 24;
+const PLAYER_STATION_MARGIN_Y = 18;
+const STATION_ACCESS_CLEARANCE = 8;
 const RESOURCE_KEYS: ResourceKey[] = ['cpu', 'gpu', 'ram', 'context', 'server'];
 const RESOURCE_LABELS: Record<ResourceKey, string> = {
   cpu: 'CPU',
@@ -700,7 +703,7 @@ export class WorkstationScene extends Phaser.Scene {
         .setDepth(isCounter ? 410 : y)
         .setInteractive({ useHandCursor: true });
       const access = isCounter
-        ? new Phaser.Math.Vector2(x, y + 82)
+        ? new Phaser.Math.Vector2(x, y + hitHeight / 2 + PLAYER_STATION_MARGIN_Y + STATION_ACCESS_CLEARANCE)
         : new Phaser.Math.Vector2(x < GAME_WIDTH / 2 ? x + 104 : x - 104, y + 18);
       const obstacle = new Phaser.Geom.Rectangle(x - hitWidth / 2, y - hitHeight / 2, hitWidth, hitHeight);
       const view: StationView = { data: station, container, frame, progress, progressMax: progressWidth, access, obstacle };
@@ -984,13 +987,11 @@ export class WorkstationScene extends Phaser.Scene {
   }
 
   private canOccupy(x: number, y: number) {
-    const marginX = 24;
-    const marginY = 18;
     return !this.stationViews.some(({ obstacle }) =>
-      x > obstacle.left - marginX
-      && x < obstacle.right + marginX
-      && y > obstacle.top - marginY
-      && y < obstacle.bottom + marginY,
+      x > obstacle.left - PLAYER_STATION_MARGIN_X
+      && x < obstacle.right + PLAYER_STATION_MARGIN_X
+      && y > obstacle.top - PLAYER_STATION_MARGIN_Y
+      && y < obstacle.bottom + PLAYER_STATION_MARGIN_Y,
     );
   }
 
