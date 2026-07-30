@@ -38,6 +38,14 @@ export interface RunResult {
   complaints: string[];
 }
 
+export interface GameLoadState {
+  phase: 'loading' | 'decoding' | 'ready' | 'error';
+  progress: number;
+  label: string;
+  loaded?: number;
+  total?: number;
+}
+
 interface StationView {
   data: WorkstationData;
   container: Phaser.GameObjects.Container;
@@ -151,6 +159,8 @@ const STATION_OUTPUT_LABELS = {
   code: '程式成果',
   deploy: '上線版本',
 } satisfies Record<WorkstationData['id'], string>;
+const UI_FONT_FAMILY = '"PingFang TC", "Noto Sans TC", "Microsoft JhengHei", "Segoe UI", sans-serif';
+const UI_TEXT_RESOLUTION = 2;
 
 export class WorkstationScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Container;
@@ -215,6 +225,7 @@ export class WorkstationScene extends Phaser.Scene {
   private readonly effects;
   private readonly rng;
   private audioContext?: AudioContext;
+  private assetLoadFailures = 0;
 
   constructor(
     private readonly model: ModelDefinition,
@@ -222,6 +233,7 @@ export class WorkstationScene extends Phaser.Scene {
     private readonly levelId: string,
     seed: number,
     private readonly onFinish: (result: RunResult) => void,
+    private readonly onLoadState: (state: GameLoadState) => void = () => undefined,
   ) {
     super('workstation');
     this.runtime = runtimeLevel(levelId);
@@ -238,6 +250,49 @@ export class WorkstationScene extends Phaser.Scene {
 
   preload() {
     const asset = (path: string) => new URL(path, document.baseURI).toString();
+    const total = 2 + this.runtime.customers.length + this.runtime.workstations.length;
+    let loaded = 0;
+    let currentLabel = '正在載入工作室場景';
+    const labelFor = (key: string) => {
+      if (key.startsWith('ai-')) return '正在載入 AI 角色';
+      if (key.startsWith('customer-')) return '正在載入客戶角色';
+      if (key.startsWith('station-')) return '正在載入工作機台';
+      return '正在載入工作室場景';
+    };
+    const report = (progress: number, label = currentLabel) => this.onLoadState({
+      phase: 'loading',
+      progress,
+      label,
+      loaded,
+      total,
+    });
+
+    this.load.on('fileprogress', (file: Phaser.Loader.File) => {
+      currentLabel = labelFor(file.key);
+      report(this.load.progress, currentLabel);
+    });
+    this.load.on('filecomplete', (key: string) => {
+      loaded = Math.min(total, loaded + 1);
+      currentLabel = labelFor(key);
+      report(this.load.progress, currentLabel);
+    });
+    this.load.on('progress', (progress: number) => report(progress));
+    this.load.on('loaderror', () => {
+      this.assetLoadFailures += 1;
+      this.onLoadState({
+        phase: 'error',
+        progress: this.load.progress,
+        label: '部分美術素材無法載入，請檢查網路後重試。',
+        loaded,
+        total,
+      });
+    });
+    this.load.on('complete', () => {
+      if (this.assetLoadFailures > 0) return;
+      this.onLoadState({ phase: 'decoding', progress: 1, label: '正在組裝工作站', loaded: total, total });
+    });
+
+    report(0);
     this.load.image(`era-${this.runtime.era}-v2`, asset(getEraBackgroundPath(this.runtime.era)));
     this.load.image(`ai-${this.model.id}-v2`, asset(getModelArtPath(this.model.id)));
     this.runtime.customers.forEach((customer) => {
@@ -249,6 +304,7 @@ export class WorkstationScene extends Phaser.Scene {
   }
 
   create() {
+    if (this.assetLoadFailures > 0) return;
     this.cameras.main.setBackgroundColor('#050a18');
     this.input.addPointer(3);
     this.makeBackdrop();
@@ -263,6 +319,7 @@ export class WorkstationScene extends Phaser.Scene {
     this.nextArrivalIn = this.runtime.arrivalSeconds;
     for (let index = 0; index < this.runtime.initialQueue; index += 1) this.spawnCustomer(true);
     this.updateHud();
+    this.onLoadState({ phase: 'ready', progress: 1, label: '工作站已就緒' });
   }
 
   update(_time: number, delta: number) {
@@ -293,6 +350,19 @@ export class WorkstationScene extends Phaser.Scene {
     this.updateControlState();
   }
 
+  private uiText(
+    x: number,
+    y: number,
+    text: string | string[],
+    style: Phaser.Types.GameObjects.Text.TextStyle = {},
+  ) {
+    return this.add.text(x, y, text, {
+      ...style,
+      fontFamily: UI_FONT_FAMILY,
+      resolution: UI_TEXT_RESOLUTION,
+    });
+  }
+
   private makeBackdrop() {
     this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x050a18);
     const backdrop = this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, `era-${this.runtime.era}-v2`);
@@ -300,10 +370,9 @@ export class WorkstationScene extends Phaser.Scene {
     backdrop.setScale(coverScale);
     this.add.rectangle(GAME_WIDTH / 2, 475, GAME_WIDTH, 570, 0x020817, 0.08);
 
-    this.add
-      .text(36, 204, `${this.runtime.name.toUpperCase()}  /  ${this.runtime.mapId}`, {
-        fontFamily: 'Inter, Noto Sans TC, sans-serif',
-        fontSize: '12px',
+    const levelNumber = Number(this.levelId.split('-').at(-1)) || 1;
+    this.uiText(36, 204, `ERA ${this.runtime.era}｜${this.runtime.name}｜第 ${levelNumber} 關`, {
+        fontSize: '14px',
         fontStyle: 'bold',
         color: '#78a9c8',
       })
@@ -312,10 +381,8 @@ export class WorkstationScene extends Phaser.Scene {
 
   private makeHud() {
     this.add.rectangle(270, 35, 168, 58, 0x07101f, 0.98).setStrokeStyle(2, 0x55e6ef, 0.75);
-    this.add.text(226, 15, '⌛', { fontSize: '24px', color: '#5ff4f4' });
-    this.timerText = this.add
-      .text(302, 35, '', {
-        fontFamily: 'Inter, Noto Sans TC, sans-serif',
+    this.uiText(226, 15, '⌛', { fontSize: '24px', color: '#5ff4f4' });
+    this.timerText = this.uiText(302, 35, '', {
         fontSize: '27px',
         fontStyle: 'bold',
         color: '#ffffff',
@@ -323,18 +390,15 @@ export class WorkstationScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add.rectangle(63, 35, 98, 54, 0x0b1729, 0.92).setStrokeStyle(1, 0x6195c5, 0.45);
-    this.scoreText = this.add
-      .text(63, 35, '', { fontSize: '13px', fontStyle: 'bold', color: '#d8f4ff', align: 'center' })
+    this.scoreText = this.uiText(63, 35, '', { fontSize: '16px', fontStyle: 'bold', color: '#d8f4ff', align: 'center' })
       .setOrigin(0.5);
     this.add.rectangle(477, 35, 98, 54, 0x0b1729, 0.92).setStrokeStyle(1, 0x6195c5, 0.45);
-    this.satisfactionText = this.add
-      .text(477, 35, '', { fontSize: '13px', fontStyle: 'bold', color: '#ffe27a', align: 'center' })
+    this.satisfactionText = this.uiText(477, 35, '', { fontSize: '16px', fontStyle: 'bold', color: '#ffe27a', align: 'center' })
       .setOrigin(0.5);
 
-    this.add.text(18, 72, '訂單佇列', { fontSize: '13px', fontStyle: 'bold', color: '#cdefff' });
-    this.queueText = this.add
-      .text(522, 72, '', {
-        fontSize: '13px',
+    this.uiText(18, 72, '訂單佇列', { fontSize: '14px', fontStyle: 'bold', color: '#cdefff' });
+    this.queueText = this.uiText(522, 72, '', {
+        fontSize: '14px',
         fontStyle: 'bold',
         color: '#7df3e7',
       })
@@ -344,14 +408,13 @@ export class WorkstationScene extends Phaser.Scene {
     const barWidth = 68;
     RESOURCE_KEYS.forEach((key, index) => {
       const x = 14 + index * 105;
-      this.add.text(x, 186, RESOURCE_LABELS[key], { fontSize: '10px', fontStyle: 'bold', color: '#8ab0c8' });
+      this.uiText(x, 186, RESOURCE_LABELS[key], { fontSize: '14px', fontStyle: 'bold', color: '#8ab0c8' });
       this.add.rectangle(x + 30, 191, barWidth, 7, 0x142740, 1).setOrigin(0, 0.5);
       const fill = this.add.rectangle(x + 30, 191, 8, 7, 0x5be7d0, 1).setOrigin(0, 0.5);
       this.loadBars.set(key, fill);
     });
 
-    this.statusText = this.add
-      .text(270, 797, '', {
+    this.statusText = this.uiText(270, 797, '', {
         fontSize: '15px',
         color: '#d9f6ff',
         align: 'center',
@@ -362,8 +425,7 @@ export class WorkstationScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(1100);
 
-    this.carriedSummaryText = this.add
-      .text(270, 762, '', {
+    this.carriedSummaryText = this.uiText(270, 762, '', {
         fontSize: '14px',
         fontStyle: 'bold',
         color: '#f1feff',
@@ -378,20 +440,17 @@ export class WorkstationScene extends Phaser.Scene {
 
   private makeOrderCard(x: number, index: number) {
     const frame = this.add.rectangle(0, 0, 160, 98, 0x0b1728, 0.96).setStrokeStyle(2, 0x4e829c, 0.45);
-    const badge = this.add
-      .text(-68, -39, `${index + 1}`, {
-        fontSize: '11px',
+    const badge = this.uiText(-68, -39, `${index + 1}`, {
+        fontSize: '14px',
         fontStyle: 'bold',
         color: '#06111c',
         backgroundColor: '#73efe4',
         padding: { x: 5, y: 2 },
       })
       .setOrigin(0.5);
-    const title = this.add
-      .text(0, -33, '', { fontSize: '13px', fontStyle: 'bold', color: '#ffffff', align: 'center' })
+    const title = this.uiText(10, -33, '', { fontSize: '16px', fontStyle: 'bold', color: '#ffffff', align: 'center' })
       .setOrigin(0.5);
-    const state = this.add
-      .text(0, 23, '', { fontSize: '11px', fontStyle: 'bold', color: '#8fb8cc', align: 'center' })
+    const state = this.uiText(0, 23, '', { fontSize: '14px', fontStyle: 'bold', color: '#8fb8cc', align: 'center' })
       .setOrigin(0.5);
     const iconSlots = [0, 1, 2].map(() => this.makeStepIcon(25, 42));
     iconSlots.forEach((slot) => slot.container.setPosition(0, -5));
@@ -437,8 +496,7 @@ export class WorkstationScene extends Phaser.Scene {
       this.fitImage(avatar, 102, 138);
       const patienceBack = this.add.rectangle(-38, -151, 76, 8, 0x17243a, 0.98).setOrigin(0, 0.5);
       const patienceFill = this.add.rectangle(-38, -151, 76, 8, 0x62ead5, 1).setOrigin(0, 0.5);
-      const alert = this.add
-        .text(0, -169, '!', { fontSize: '18px', fontStyle: 'bold', color: '#ff826e' })
+      const alert = this.uiText(0, -169, '!', { fontSize: '18px', fontStyle: 'bold', color: '#ff826e' })
         .setOrigin(0.5)
         .setVisible(false);
       const container = this.add.container(270, 354, [avatar, patienceBack, patienceFill, alert]).setDepth(354).setVisible(false);
@@ -474,12 +532,10 @@ export class WorkstationScene extends Phaser.Scene {
   private makeStepIcon(size: number, spread: number): StepIconView {
     const plate = this.add.circle(0, 0, size * 0.5, 0x061421, 0.98).setStrokeStyle(Math.max(1, size * 0.08), 0x6f96a8, 0.45);
     const glyph = this.add.graphics();
-    const check = this.add
-      .text(size * 0.3, size * 0.28, '✓', { fontSize: `${Math.max(8, Math.round(size * 0.42))}px`, fontStyle: 'bold', color: '#f3fff9' })
+    const check = this.uiText(size * 0.3, size * 0.28, '✓', { fontSize: `${Math.max(8, Math.round(size * 0.42))}px`, fontStyle: 'bold', color: '#f3fff9' })
       .setOrigin(0.5)
       .setVisible(false);
-    const more = this.add
-      .text(0, 0, '', { fontSize: `${Math.max(8, Math.round(size * 0.46))}px`, fontStyle: 'bold', color: '#d8c7ff' })
+    const more = this.uiText(0, 0, '', { fontSize: `${Math.max(8, Math.round(size * 0.46))}px`, fontStyle: 'bold', color: '#d8c7ff' })
       .setOrigin(0.5)
       .setVisible(false);
     const container = this.add.container(0, 0, [plate, glyph, check, more]).setVisible(false);
@@ -683,8 +739,7 @@ export class WorkstationScene extends Phaser.Scene {
         .rectangle(0, labelY, labelWidth, labelHeight, 0x03101c, compact && !isCounter ? 0.76 : 0.9)
         .setStrokeStyle(1, color, 0.72)
         .setVisible(!compact || isCounter);
-      const label = this.add
-        .text(0, labelY, STATION_SHORT_LABELS[station.id], {
+      const label = this.uiText(0, labelY, STATION_SHORT_LABELS[station.id], {
           fontSize: isCounter ? '15px' : compact ? '12px' : '14px',
           fontStyle: 'bold',
           color: '#effbff',
@@ -720,7 +775,7 @@ export class WorkstationScene extends Phaser.Scene {
       if (isCounter) {
         const trayGlow = this.add.ellipse(0, -3, 126, 34, 0x76efff, 0.2).setStrokeStyle(2, 0x9bfbff, 0.75);
         const trayCore = this.add.ellipse(0, -3, 88, 18, 0x071727, 0.95).setStrokeStyle(2, 0xffd46d, 0.75);
-        const trayIcon = this.add.text(0, -4, '交付', { fontSize: '12px', fontStyle: 'bold', color: '#f8ffff' }).setOrigin(0.5);
+        const trayIcon = this.uiText(0, -4, '交付', { fontSize: '12px', fontStyle: 'bold', color: '#f8ffff' }).setOrigin(0.5);
         this.deliveryTray = this.add.container(x, y - 2, [trayGlow, trayCore, trayIcon]).setDepth(414);
         this.tweens.add({ targets: trayGlow, alpha: 0.42, duration: 900, ease: 'Sine.InOut', yoyo: true, repeat: -1 });
       }
@@ -732,8 +787,7 @@ export class WorkstationScene extends Phaser.Scene {
     const shadow = this.add.ellipse(0, 48, 76, 24, 0x000000, 0.42);
     this.playerAvatar = this.add.image(0, -27, `ai-${this.model.id}-v2`);
     this.fitImage(this.playerAvatar, 118, 158);
-    const cue = this.add
-      .text(0, -116, this.model.glyph, {
+    const cue = this.uiText(0, -116, this.model.glyph, {
         fontSize: '15px',
         fontStyle: 'bold',
         color: '#ffffff',
@@ -764,8 +818,7 @@ export class WorkstationScene extends Phaser.Scene {
     this.fitImage(avatar, 78, 104);
     const folderVisual = this.makeFolderVisual(48, 35);
     const folder = folderVisual.container.setPosition(29, 2).setAngle(-8).setVisible(false);
-    const stateText = this.add
-      .text(0, -82, 'AGENT 待命', {
+    const stateText = this.uiText(0, -82, 'AGENT 待命', {
         fontSize: '11px',
         fontStyle: 'bold',
         color: '#efeaff',
@@ -804,7 +857,7 @@ export class WorkstationScene extends Phaser.Scene {
     const joystickBase = this.add.circle(86, 890, 50, 0x0e2037, 0.95).setStrokeStyle(2, 0x5aa4be, 0.55).setDepth(1000);
     this.add.circle(86, 890, 31, 0x102c47, 0.8).setStrokeStyle(1, 0x73dff1, 0.35).setDepth(1001);
     this.joystickKnob = this.add.circle(86, 890, 22, 0x6be9eb, 0.86).setStrokeStyle(3, 0xdfffff, 0.7).setDepth(1002);
-    this.add.text(86, 947, '移動', { fontSize: '12px', fontStyle: 'bold', color: '#85afc6' }).setOrigin(0.5).setDepth(1002);
+    this.uiText(86, 947, '移動', { fontSize: '12px', fontStyle: 'bold', color: '#85afc6' }).setOrigin(0.5).setDepth(1002);
     joystickBase.setInteractive(new Phaser.Geom.Circle(50, 50, 50), Phaser.Geom.Circle.Contains);
     joystickBase.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       this.joystickPointerId = pointer.id;
@@ -839,8 +892,8 @@ export class WorkstationScene extends Phaser.Scene {
     const shadow = this.add.circle(0, 5, radius + 5, 0x000000, 0.4);
     const outer = this.add.circle(0, 0, radius + 3, 0x10243a, 1).setStrokeStyle(2, color, 0.9);
     const inner = this.add.circle(0, 0, radius - 6, color, 0.72);
-    const iconText = this.add.text(0, -7, icon, { fontSize: `${Math.max(17, radius * 0.48)}px`, fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
-    const labelText = this.add.text(0, radius * 0.42, label, { fontSize: '12px', fontStyle: 'bold', color: '#e7fbff' }).setOrigin(0.5);
+    const iconText = this.uiText(0, -7, icon, { fontSize: `${Math.max(17, radius * 0.48)}px`, fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
+    const labelText = this.uiText(0, radius * 0.42, label, { fontSize: '12px', fontStyle: 'bold', color: '#e7fbff' }).setOrigin(0.5);
     const container = this.add.container(x, y, [shadow, outer, inner, labelText, iconText]).setSize(radius * 2.1, radius * 2.1).setDepth(1010);
     container.setInteractive(new Phaser.Geom.Circle(radius, radius, radius), Phaser.Geom.Circle.Contains);
     container.on('pointerdown', () => {
@@ -1042,39 +1095,33 @@ export class WorkstationScene extends Phaser.Scene {
   private showOrderDetails(order: ProjectBox) {
     if (this.decision || this.orderDetail || this.finished) return;
     this.cancelAutoMovement();
-    const veil = this.add.rectangle(270, 480, 540, 960, 0x020611, 0.78).setInteractive();
+    const veil = this.add.rectangle(0, 0, 540, 960, 0x020611, 0.78).setInteractive();
     const panel = this.add.rectangle(0, 0, 500, 700, 0x071323, 0.995).setStrokeStyle(3, 0x70e3ed, 0.9);
-    const title = this.add
-      .text(0, -316, order.recipe.name, { fontSize: '24px', fontStyle: 'bold', color: '#ffffff', align: 'center' })
+    const title = this.uiText(0, -316, order.recipe.name, { fontSize: '28px', fontStyle: 'bold', color: '#ffffff', align: 'center' })
       .setOrigin(0.5);
-    const customer = this.add
-      .text(0, -281, `${order.customer.name}　耐心 ${Math.round(order.patience)}`, { fontSize: '13px', color: '#9fc8d9', align: 'center' })
+    const customer = this.uiText(0, -278, `${order.customer.name}　耐心 ${Math.round(order.patience)}`, { fontSize: '16px', color: '#9fc8d9', align: 'center' })
       .setOrigin(0.5);
     const modeText = order.recipe.sequenceMode === 'ordered'
       ? '固定順序　依 1 → 2 → 3 完成'
       : '自由順序　所有項目完成即可';
-    const mode = this.add
-      .text(0, -247, modeText, {
-        fontSize: '14px',
+    const mode = this.uiText(0, -241, modeText, {
+        fontSize: '16px',
         fontStyle: 'bold',
         color: order.recipe.sequenceMode === 'ordered' ? '#ffd166' : '#73efe4',
         backgroundColor: '#13243b',
         padding: { x: 12, y: 6 },
       })
       .setOrigin(0.5);
-    const purpose = this.add
-      .text(-220, -207, `目的｜${order.recipe.purpose}`, { fontSize: '13px', color: '#dff9ff', wordWrap: { width: 440 } })
+    const purpose = this.uiText(-220, -201, `目的｜${order.recipe.purpose}`, { fontSize: '16px', color: '#dff9ff', wordWrap: { width: 440 } })
       .setOrigin(0, 0);
-    const action = this.add
-      .text(-220, -169, `要做｜${order.recipe.action}`, { fontSize: '13px', color: '#dff9ff', wordWrap: { width: 440 } })
+    const action = this.uiText(-220, -161, `要做｜${order.recipe.action}`, { fontSize: '16px', color: '#dff9ff', wordWrap: { width: 440 } })
       .setOrigin(0, 0);
-    const result = this.add
-      .text(-220, -131, `交付｜${order.recipe.result}`, { fontSize: '13px', fontStyle: 'bold', color: '#ffe28a', wordWrap: { width: 440 } })
+    const result = this.uiText(-220, -121, `交付｜${order.recipe.result}`, { fontSize: '16px', fontStyle: 'bold', color: '#ffe28a', wordWrap: { width: 440 } })
       .setOrigin(0, 0);
     const children: Phaser.GameObjects.GameObject[] = [veil, panel, title, customer, mode, purpose, action, result];
-    const stepStartY = -68;
+    const stepStartY = -62;
     order.recipe.runtimeSteps.slice(0, 6).forEach((step, index) => {
-      const rowY = stepStartY + index * 49;
+      const rowY = stepStartY + index * 52;
       const color = STATION_COLORS[step.stationId];
       const complete = isProjectStepComplete(order, step);
       const icon = this.makeStepIcon(34, 0);
@@ -1082,16 +1129,13 @@ export class WorkstationScene extends Phaser.Scene {
       icon.plate.setFillStyle(0x061421, 1).setStrokeStyle(3, color, 1);
       this.drawStationGlyph(icon.glyph, step.stationId, 34, color);
       icon.check.setVisible(complete);
-      const number = this.add
-        .text(-166, rowY, order.recipe.sequenceMode === 'ordered' ? `${index + 1}` : '•', {
-          fontSize: '15px', fontStyle: 'bold', color: '#ffffff',
+      const number = this.uiText(-166, rowY, order.recipe.sequenceMode === 'ordered' ? `${index + 1}` : '•', {
+          fontSize: '16px', fontStyle: 'bold', color: '#ffffff',
         })
         .setOrigin(0.5);
-      const station = this.add
-        .text(-145, rowY - 10, STATION_SHORT_LABELS[step.stationId], { fontSize: '14px', fontStyle: 'bold', color: '#ffffff' })
+      const station = this.uiText(-145, rowY - 10, STATION_SHORT_LABELS[step.stationId], { fontSize: '16px', fontStyle: 'bold', color: '#ffffff' })
         .setOrigin(0, 0.5);
-      const output = this.add
-        .text(-145, rowY + 11, STATION_OUTPUT_LABELS[step.stationId], { fontSize: '11px', color: '#8fb5c8' })
+      const output = this.uiText(-145, rowY + 12, STATION_OUTPUT_LABELS[step.stationId], { fontSize: '14px', color: '#8fb5c8' })
         .setOrigin(0, 0.5);
       const state = complete
         ? '已完成'
@@ -1100,21 +1144,19 @@ export class WorkstationScene extends Phaser.Scene {
           : index === order.stage
             ? '目前工序'
             : '後續工序';
-      const stateText = this.add
-        .text(214, rowY, state, { fontSize: '11px', fontStyle: 'bold', color: complete ? '#69e6a7' : '#b6d6e5' })
+      const stateText = this.uiText(214, rowY, state, { fontSize: '14px', fontStyle: 'bold', color: complete ? '#69e6a7' : '#b6d6e5' })
         .setOrigin(1, 0.5);
       children.push(icon.container, number, station, output, stateText);
     });
     const impact = order.decisionImpact
       ? `${order.decisionImpact.label}｜${order.decisionImpact.summary}`
       : '尚未接單｜前往櫃檯選擇處理方式';
-    const footer = this.add
-      .text(0, 249, `${impact}\n報酬 ${order.recipe.reward}　品質門檻 ${order.recipe.qualityTarget}`, {
-        fontSize: '12px', color: '#c9e9f4', align: 'center', wordWrap: { width: 430 },
+    const footer = this.uiText(0, 255, `${impact}\n報酬 ${order.recipe.reward}　品質門檻 ${order.recipe.qualityTarget}`, {
+        fontSize: '14px', color: '#c9e9f4', align: 'center', wordWrap: { width: 430 },
       })
       .setOrigin(0.5);
-    const close = this.add.rectangle(0, 312, 190, 50, 0x174158, 1).setStrokeStyle(2, 0x6cece5, 0.7).setInteractive({ useHandCursor: true });
-    const closeText = this.add.text(0, 312, '關閉訂單詳情', { fontSize: '14px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
+    const close = this.add.rectangle(0, 315, 210, 54, 0x174158, 1).setStrokeStyle(2, 0x6cece5, 0.7).setInteractive({ useHandCursor: true });
+    const closeText = this.uiText(0, 315, '關閉訂單詳情', { fontSize: '16px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
     children.push(footer, close, closeText);
     const closeDetails = () => {
       this.orderDetail?.destroy();
@@ -1135,25 +1177,21 @@ export class WorkstationScene extends Phaser.Scene {
       ['替代方案', 'alternative'],
       ['拒絕委託', 'reject'],
     ];
-    const veil = this.add.rectangle(270, 480, 540, 960, 0x020611, 0.68).setInteractive();
-    const panel = this.add.rectangle(0, 0, 500, 470, 0x071323, 0.99).setStrokeStyle(2, 0x70e3ed, 0.85);
-    const title = this.add.text(0, -198, this.box.recipe.name, { fontSize: '24px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
-    const subtitle = this.add.text(0, -163, `${this.box.customer.name}　耐心 ${Math.round(this.box.patience)}`, { fontSize: '14px', color: '#9ec8d8', align: 'center' }).setOrigin(0.5);
-    const purpose = this.add.text(-218, -116, `◎ 目的　${this.box.recipe.purpose}`, { fontSize: '14px', color: '#dcf8ff', wordWrap: { width: 438 } }).setOrigin(0, 0.5);
-    const action = this.add.text(-218, -74, `➜ 動作　${this.box.recipe.action}`, { fontSize: '14px', color: '#dcf8ff', wordWrap: { width: 438 } }).setOrigin(0, 0.5);
-    const outcome = this.add.text(-218, -32, `◆ 成果　${this.box.recipe.result}`, { fontSize: '14px', color: '#ffe28a', wordWrap: { width: 438 } }).setOrigin(0, 0.5);
+    const veil = this.add.rectangle(0, 0, 540, 960, 0x020611, 0.84).setInteractive();
+    const panel = this.add.rectangle(0, 0, 500, 760, 0x071323, 0.99).setStrokeStyle(2, 0x70e3ed, 0.85);
+    const title = this.uiText(0, -334, this.box.recipe.name, { fontSize: '28px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
+    const subtitle = this.uiText(0, -296, `${this.box.customer.name}　耐心 ${Math.round(this.box.patience)}`, { fontSize: '17px', color: '#c8e6ef', align: 'center' }).setOrigin(0.5);
+    const purpose = this.uiText(-218, -250, `◎ 目的　${this.box.recipe.purpose}`, { fontSize: '17px', color: '#dcf8ff', wordWrap: { width: 438 } }).setOrigin(0, 0.5);
+    const action = this.uiText(-218, -208, `➜ 動作　${this.box.recipe.action}`, { fontSize: '17px', color: '#dcf8ff', wordWrap: { width: 438 } }).setOrigin(0, 0.5);
+    const outcome = this.uiText(-218, -166, `◆ 成果　${this.box.recipe.result}`, { fontSize: '17px', color: '#ffe28a', wordWrap: { width: 438 } }).setOrigin(0, 0.5);
     const children: Phaser.GameObjects.GameObject[] = [veil, panel, title, subtitle, purpose, action, outcome];
     choices.forEach(([label, value], index) => {
       const preview = decideCustomer(structuredClone(this.box!), value).impact;
       const detail = preview.details.slice(0, 2).join('｜');
-      const row = Math.floor(index / 2);
-      const column = index % 2;
-      const x = index === 4 ? 0 : -120 + column * 240;
-      const y = 42 + row * 78;
-      const button = this.add.rectangle(x, y, index === 4 ? 220 : 205, 58, 0x173653, 1).setStrokeStyle(2, 0x5ca9c4, 0.55).setInteractive({ useHandCursor: true });
-      const buttonText = this.add.text(x, y - 8, label, { fontSize: '17px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
-      const detailText = this.add
-        .text(x, y + 14, detail, { fontSize: '10px', color: '#9fc9da', align: 'center', wordWrap: { width: index === 4 ? 205 : 188 } })
+      const y = -95 + index * 72;
+      const button = this.add.rectangle(0, y, 440, 62, 0x173653, 1).setStrokeStyle(2, 0x5ca9c4, 0.55).setInteractive({ useHandCursor: true });
+      const buttonText = this.uiText(0, y - 10, label, { fontSize: '19px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
+      const detailText = this.uiText(0, y + 14, detail, { fontSize: '15px', color: '#d4edf6', align: 'center', wordWrap: { width: 410 } })
         .setOrigin(0.5);
       button.on('pointerdown', () => this.choose(value));
       children.push(button, buttonText, detailText);
@@ -1377,14 +1415,14 @@ export class WorkstationScene extends Phaser.Scene {
     if (!box?.addOn || this.decision) return;
     this.addOnBox = box;
     this.addOnSource = source;
-    const veil = this.add.rectangle(270, 480, 540, 960, 0x020611, 0.68).setInteractive();
+    const veil = this.add.rectangle(0, 0, 540, 960, 0x020611, 0.68).setInteractive();
     const panel = this.add.rectangle(0, 0, 490, 245, 0x1a1024, 0.99).setStrokeStyle(2, 0xff79c3, 0.85);
-    const title = this.add.text(0, -82, '⚠ 客戶追加要求', { fontSize: '19px', fontStyle: 'bold', color: '#ffb6dd' }).setOrigin(0.5);
-    const request = this.add.text(0, -35, `「${box.addOn.label}」`, { fontSize: '16px', color: '#ffffff', align: 'center' }).setOrigin(0.5);
+    const title = this.uiText(0, -82, '⚠ 客戶追加要求', { fontSize: '22px', fontStyle: 'bold', color: '#ffb6dd' }).setOrigin(0.5);
+    const request = this.uiText(0, -35, `「${box.addOn.label}」`, { fontSize: '17px', color: '#ffffff', align: 'center' }).setOrigin(0.5);
     const accept = this.add.rectangle(-112, 58, 190, 62, 0x17615e, 1).setStrokeStyle(2, 0x6cf4df, 0.8).setInteractive({ useHandCursor: true });
     const reject = this.add.rectangle(112, 58, 190, 62, 0x532035, 1).setStrokeStyle(2, 0xff8fb6, 0.8).setInteractive({ useHandCursor: true });
-    const acceptText = this.add.text(-112, 58, '接受追加\n重新處理', { fontSize: '13px', fontStyle: 'bold', color: '#ffffff', align: 'center' }).setOrigin(0.5);
-    const rejectText = this.add.text(112, 58, '拒絕追加\n直接交付', { fontSize: '13px', fontStyle: 'bold', color: '#ffffff', align: 'center' }).setOrigin(0.5);
+    const acceptText = this.uiText(-112, 58, '接受追加\n重新處理', { fontSize: '15px', fontStyle: 'bold', color: '#ffffff', align: 'center' }).setOrigin(0.5);
+    const rejectText = this.uiText(112, 58, '拒絕追加\n直接交付', { fontSize: '15px', fontStyle: 'bold', color: '#ffffff', align: 'center' }).setOrigin(0.5);
     accept.on('pointerdown', () => this.answerAddOn(true));
     reject.on('pointerdown', () => this.answerAddOn(false));
     this.decision = this.add.container(270, 480, [veil, panel, title, request, accept, reject, acceptText, rejectText]).setDepth(2000);
@@ -1646,9 +1684,10 @@ export class WorkstationScene extends Phaser.Scene {
     const urgent = this.left <= 30;
     this.timerText.setText(`${Math.floor(this.left / 60)}:${String(this.left % 60).padStart(2, '0')}`);
     this.timerText.setColor(urgent ? '#ff806c' : '#ffffff');
+    this.tweens.killTweensOf(this.timerText);
+    this.timerText.setScale(1).setAlpha(1);
     if (urgent) {
-      this.tweens.killTweensOf(this.timerText);
-      this.tweens.add({ targets: this.timerText, scale: 1.12, duration: 220, yoyo: true });
+      this.tweens.add({ targets: this.timerText, alpha: 0.62, duration: 220, yoyo: true });
     }
     this.scoreText.setText(`SCORE\n${this.score}`);
     this.satisfactionText.setText(`滿意度\n${Math.round(this.satisfaction)}%`);
@@ -1676,7 +1715,7 @@ export class WorkstationScene extends Phaser.Scene {
               ? 0xffd16e
               : 0x538aa4;
       card.frame.setStrokeStyle(isActive || helperOwns || Boolean(stationJob) ? 3 : 2, frameColor, isActive || helperOwns || stationJob ? 0.95 : 0.58);
-      card.title.setText(order.recipe.name.length > 9 ? `${order.recipe.name.slice(0, 9)}…` : order.recipe.name);
+      card.title.setText(order.recipe.name.length > 7 ? `${order.recipe.name.slice(0, 7)}…` : order.recipe.name);
       const orderState = stationJob
         ? stationJob.complete
           ? `${STATION_SHORT_LABELS[stationJob.view.data.id]}完成・待取回`

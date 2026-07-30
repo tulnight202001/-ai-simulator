@@ -1,1 +1,27 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><meta name="theme-color" content="#07101e"><meta name="description" content="手機直向單人即時 AI 工作站管理遊戲"><link rel="manifest" href="manifest.webmanifest"><title>關於我重生為 AI 模型的⋯</title></head><body><div id="app"></div><script type="module" src="/src/main.ts?v=portrait-v1"></script></body></html>
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+    <meta name="theme-color" content="#07101e">
+    <meta name="description" content="手機直向單人即時 AI 工作站管理遊戲">
+    <link rel="manifest" href="manifest.webmanifest">
+    <title>關於我重生為 AI 模型的⋯</title>
+    <style>
+      html,body,#app{width:100%;min-height:100%;margin:0}body{min-height:100dvh;color:#f5fbff;background:#050914;font-family:Inter,"Noto Sans TC","Segoe UI",system-ui,sans-serif}#boot-screen{box-sizing:border-box;min-height:100dvh;display:grid;place-content:center;justify-items:center;gap:14px;padding:max(24px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(28px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left));text-align:center;background:radial-gradient(circle at 50% 36%,#123d63 0,transparent 34%),linear-gradient(160deg,#050914,#071526)}#boot-screen p,#boot-screen h1{margin:0}.boot-mark{position:relative;width:76px;height:76px;border:2px solid #61eee5;border-radius:24px;box-shadow:0 0 32px #48deda55,inset 0 0 24px #47d9e522}.boot-mark::before{content:"◇";position:absolute;inset:0;display:grid;place-items:center;color:#dffffb;font-size:34px;text-shadow:0 0 16px #69fff6}.boot-mark::after{content:"";position:absolute;inset:-8px;border:2px solid #79a8ff77;border-radius:29px;animation:boot-pulse 1.15s ease-in-out infinite}.boot-kicker{color:#7fc6e8;font-size:10px;font-weight:900;letter-spacing:.18em}.boot-title{font-size:clamp(24px,7vw,34px);line-height:1.15}.boot-track{width:min(280px,72vw);height:6px;overflow:hidden;border:1px solid #6ccfd355;border-radius:99px;background:#0b2033}.boot-track i{display:block;width:42%;height:100%;border-radius:inherit;background:linear-gradient(90deg,#6d91ff,#64eee1);animation:boot-load 1.25s ease-in-out infinite}.boot-note{color:#9ab4c7;font-size:12px}@keyframes boot-pulse{50%{transform:scale(1.1);opacity:.45}}@keyframes boot-load{from{transform:translateX(-110%)}to{transform:translateX(345%)}}@media(prefers-reduced-motion:reduce){.boot-mark::after,.boot-track i{animation-duration:.01ms;animation-iteration-count:1}}
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <main id="boot-screen" role="status" aria-live="polite" aria-busy="true">
+        <div class="boot-mark" aria-hidden="true"></div>
+        <p class="boot-kicker">AI WORKSTATION / BOOT</p>
+        <h1 class="boot-title">正在啟動工作站</h1>
+        <div class="boot-track" aria-hidden="true"><i></i></div>
+        <p class="boot-note">首次開啟可能需要幾秒</p>
+      </main>
+    </div>
+    <noscript>此遊戲需要啟用 JavaScript。</noscript>
+    <script type="module" src="/src/main.ts?v=portrait-v1"></script>
+  </body>
+</html>

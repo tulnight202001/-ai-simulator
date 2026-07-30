@@ -1,16 +1,15 @@
-import Phaser from 'phaser';
 import './style.css';
 import { buyUpgrade, createCareer, ensureAgentAvailability, recordLevel, type Career } from './core/career';
 import { drawModelChoices } from './core/modelDraw';
 import { isLevelUnlocked } from './core/v1Runtime';
 import { models, type ModelDefinition } from './data/content';
 import { v1Levels, v1Upgrades, type LevelData } from './data/v1Catalog';
-import { WorkstationScene, type RunResult } from './game/WorkstationScene';
+import type { RunResult } from './game/WorkstationScene';
 import { deleteCareer, exportCareer, loadCareers, previewImport, saveCareer } from './services/save';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 const dailySeed = Math.floor(Date.now() / 86_400_000);
-let game: Phaser.Game | undefined;
+let game: import('phaser').Game | undefined;
 let chosen: ModelDefinition | undefined;
 let activeCareer: Career | undefined;
 let selectedLevel: LevelData | undefined;
@@ -300,40 +299,127 @@ function levelSelect() {
   document.querySelector('#hub')!.addEventListener('click', careerHub);
 }
 
-function startGame() {
+async function startGame() {
   if (!selectedLevel || !activeCareer || !chosen) return void levelSelect();
+  const level = selectedLevel;
+  const model = chosen;
   app.innerHTML = `
     <main class="game-shell">
       <div id="game" aria-label="即時工作站遊戲區"></div>
-      <button id="pause-game" class="pause-game" aria-label="暫停">Ⅱ</button>
+      <section id="game-loader" class="game-loader" role="status" aria-live="polite">
+        <div class="loader-core" aria-hidden="true"><i>${escapeHtml(model.glyph)}</i><span></span></div>
+        <p class="loader-kicker">ERA ${level.era} ・ ${escapeHtml(level.name)}</p>
+        <h1>正在啟動 AI 工作站</h1>
+        <p id="loader-stage" class="loader-stage">初始化遊戲引擎</p>
+        <div class="loader-meter" aria-hidden="true"><i id="loader-bar"></i></div>
+        <div class="loader-progress"><strong id="loader-percent">準備中</strong><span id="loader-count">首次載入會下載高畫質素材</span></div>
+        <p class="loader-tip">訂單圖示與機台顏色相同；先看圖示，再安排處理順序。</p>
+        <div id="loader-error" class="loader-error" hidden>
+          <b>工作站載入失敗</b>
+          <span id="loader-error-message">請檢查網路後再試一次。</span>
+          <div><button id="loader-retry">重新載入</button><button id="loader-back">返回選關</button></div>
+        </div>
+      </section>
+      <button id="pause-game" class="pause-game" aria-label="暫停" hidden>Ⅱ</button>
       <div id="pause-card" class="pause-card" hidden><b>工作暫停</b><span>點右上角繼續</span><button id="leave-game">離開班次</button></div>
     </main>`;
 
   window.scrollTo({ top: 0, left: 0 });
+  const loader = document.querySelector<HTMLElement>('#game-loader')!;
+  const loaderStage = document.querySelector<HTMLElement>('#loader-stage')!;
+  const loaderBar = document.querySelector<HTMLElement>('#loader-bar')!;
+  const loaderPercent = document.querySelector<HTMLElement>('#loader-percent')!;
+  const loaderCount = document.querySelector<HTMLElement>('#loader-count')!;
+  const loaderError = document.querySelector<HTMLElement>('#loader-error')!;
+  const loaderErrorMessage = document.querySelector<HTMLElement>('#loader-error-message')!;
+  const pauseButton = document.querySelector<HTMLButtonElement>('#pause-game')!;
+  let loadFailed = false;
+
+  const showLoadError = (message: string) => {
+    loadFailed = true;
+    loader.classList.add('has-error');
+    loaderStage.textContent = '載入未完成';
+    loaderErrorMessage.textContent = message;
+    loaderError.hidden = false;
+  };
+
+  document.querySelector<HTMLButtonElement>('#loader-retry')!.onclick = () => {
+    game?.destroy(true);
+    game = undefined;
+    void startGame();
+  };
+  document.querySelector<HTMLButtonElement>('#loader-back')!.onclick = () => {
+    game?.destroy(true);
+    game = undefined;
+    levelSelect();
+  };
+
+  // Let the loading screen paint before downloading and parsing the game engine.
+  await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+
   const sceneCareer = runMode === 'trial' ? structuredClone(activeCareer) : activeCareer;
-  if (runMode === 'trial' && selectedLevel.era >= 4) {
+  if (runMode === 'trial' && level.era >= 4) {
     sceneCareer.agent.unlocked = true;
-    sceneCareer.agent.level = Math.max(sceneCareer.agent.level, selectedLevel.era === 4 ? 1 : 2);
+    sceneCareer.agent.level = Math.max(sceneCareer.agent.level, level.era === 4 ? 1 : 2);
     sceneCareer.agent.assignment = null;
   }
-  const sceneSeed = activeCareer.seed + selectedLevel.index + (runMode === 'trial' ? selectedLevel.era * 1_000 : 0);
-  const scene = new WorkstationScene(chosen, sceneCareer, selectedLevel.id, sceneSeed, finish);
-  game = new Phaser.Game({
-    type: Phaser.AUTO,
-    parent: 'game',
-    backgroundColor: '#050a18',
-    scene,
-    scale: {
-      mode: Phaser.Scale.FIT,
-      autoCenter: Phaser.Scale.CENTER_BOTH,
-      width: 540,
-      height: 960,
-    },
-    render: { antialias: true, roundPixels: false },
-    input: { activePointers: 4 },
-  });
+  const sceneSeed = activeCareer.seed + level.index + (runMode === 'trial' ? level.era * 1_000 : 0);
 
-  const pauseButton = document.querySelector<HTMLButtonElement>('#pause-game')!;
+  try {
+    const [{ default: Phaser }, { WorkstationScene }] = await Promise.all([
+      import('phaser'),
+      import('./game/WorkstationScene'),
+    ]);
+    if (!document.body.contains(loader)) return;
+    loaderStage.textContent = '準備關卡素材';
+
+    const scene = new WorkstationScene(model, sceneCareer, level.id, sceneSeed, finish, (state) => {
+      if (!document.body.contains(loader)) return;
+      if (state.phase === 'error') {
+        showLoadError(state.label);
+        return;
+      }
+      if (state.phase === 'ready') {
+        if (loadFailed) return;
+        loaderBar.style.width = '100%';
+        loaderPercent.textContent = '100%';
+        loaderStage.textContent = '工作站已就緒';
+        loader.classList.add('is-ready');
+        pauseButton.hidden = false;
+        window.setTimeout(() => loader.remove(), 240);
+        return;
+      }
+
+      loader.classList.add('has-progress');
+      const percent = Math.max(0, Math.min(100, Math.round(state.progress * 100)));
+      loaderBar.style.width = `${percent}%`;
+      loaderPercent.textContent = `${percent}%`;
+      loaderStage.textContent = state.label;
+      loaderCount.textContent = state.total
+        ? `已完成 ${state.loaded ?? 0} / ${state.total} 項素材`
+        : '正在建立遊戲畫面';
+    });
+
+    game = new Phaser.Game({
+      type: Phaser.AUTO,
+      parent: 'game',
+      backgroundColor: '#050a18',
+      scene,
+      scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: 540,
+        height: 960,
+      },
+      loader: { timeout: 20_000, maxParallelDownloads: 6 },
+      render: { antialias: true, roundPixels: false },
+      input: { activePointers: 4 },
+    });
+  } catch (error) {
+    showLoadError(error instanceof Error ? `遊戲核心無法啟動：${error.message}` : '遊戲核心無法啟動，請再試一次。');
+    return;
+  }
+
   const pauseCard = document.querySelector<HTMLElement>('#pause-card')!;
   let paused = false;
   pauseButton.onclick = () => {
